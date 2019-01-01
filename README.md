@@ -1,8 +1,8 @@
 # Datatypes as Quotients of Polynomial Functors
 
-This repository contains joint work in progress by Jeremy Avigad, Mario Carneiro, and Simon Hudon.
+This repository contains work in progress by Jeremy Avigad, Mario Carneiro, and Simon Hudon.
 
-In analogy to Isabelle's *bounded natural functors*, we represent datatypes as *quotients of polynomial functors*. The file `qpf.lean` shows that every qpf has an initial algebra and a final coalgebra, and that compositions and quotients of qpfs are again qpfs.
+In analogy to Isabelle's *bounded natural functors*, we represent datatypes as *quotients of polynomial functors*. The file `qpf.lean` shows that every qpf has an initial algebra and a final coalgebra, and that compositions and quotients of qpfs are again qpfs. It should compile with any recent version of Lean's `mathlib`.
 
 (The constructions depend on M-type constructions which we have also carried out in Lean, but, at the moment, they are assumed axiomatically in `qpf.lean`.)
 
