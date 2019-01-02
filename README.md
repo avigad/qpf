@@ -8,4 +8,4 @@ In analogy to Isabelle's *bounded natural functors*, we represent datatypes as *
 
 We are working on a multiple-arity version of qpfs, and showing that the qpf structure is preserved under the initial algebra and final coalgebra constructions.
 
-For more information, see this talk: [http://www.andrew.cmu.edu/user/avigad/Talks/qpf](http://www.andrew.cmu.edu/user/avigad/Talks/qpf).
+For more information, see this talk: [http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf](http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf).
