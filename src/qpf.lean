@@ -3,12 +3,15 @@ Copyright (c) 2018 Jeremy Avigad. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Jeremy Avigad
 
-Cast of characters:
+We assume the following:
 
 `P`   : a polynomial functor
 `W`   : its W-type
 `M`   : its M-type
 `F`   : a functor
+
+We define:
+
 `q`   : `qpf` data, representing `F` as a quotient of `P`
 
 The main goal is to construct:
@@ -19,7 +22,7 @@ The main goal is to construct:
 We also show that the composition of qpfs is a qpf, and that the quotient of a qpf
 is a qpf.
 -/
-import tactic.interactive data.multiset
+import tactic.interactive data.multiset .Mtype
 universe u
 
 /-
@@ -36,61 +39,6 @@ def factor_mk_eq {α : Type*} (r s: α → α → Prop) (h : ∀ x y, r x y → 
   factor r s h ∘ quot.mk _= quot.mk _ := rfl
 
 end quot
-
-/-
-A polynomial functor `P` is given by a type `A` and a family `B` of types over `A`. `P` maps 
-any type `α` to a new type `P.apply α`. 
-
-An element of `P.apply α` is a pair `⟨a, f⟩`, where `a` is an element of a type `A` and 
-`f : B a → α`. Think of `a` as the shape of the object and `f` as an index to the relevant
-elements of `α`.
--/
-
-structure pfunctor :=
-(A : Type u) (B : A → Type u)
-
-namespace pfunctor
-
-variables (P : pfunctor) {α β : Type u}
-
--- TODO: generalize to psigma?
-def apply (α : Type*) := Σ x : P.A, P.B x → α
-
-def map {α β : Type*} (f : α → β) : P.apply α → P.apply β := 
-λ ⟨a, g⟩, ⟨a, f ∘ g⟩ 
-
-instance : functor P.apply := {map := @map P}
-
-theorem map_eq {α β : Type*} (f : α → β) (a : P.A) (g : P.B a → α) :
-  @functor.map P.apply _ _ _ f ⟨a, g⟩ = ⟨a, f ∘ g⟩ := 
-rfl
-
-theorem id_map {α : Type*} : ∀ x : P.apply α, id <$> x = id x :=
-λ ⟨a, b⟩, rfl
-
-theorem comp_map {α β γ : Type*} (f : α → β) (g : β → γ) :
-  ∀ x : P.apply α, (g ∘ f) <$> x = g <$> (f <$> x) :=
-λ ⟨a, b⟩, rfl
-
-instance : is_lawful_functor P.apply := 
-{id_map := @id_map P, comp_map := @comp_map P}
-
-inductive W
-| mk (a : P.A) (f : P.B a → W) : W
-
-def W_dest : W P → P.apply (W P)
-| ⟨a, f⟩ := ⟨a, f⟩ 
-
-def W_mk : P.apply (W P) → W P
-| ⟨a, f⟩ := ⟨a, f⟩ 
-
-@[simp] theorem W_dest_W_mk (p : P.apply (W P)) : P.W_dest (P.W_mk p) = p :=
-by cases p; reflexivity
-
-@[simp] theorem W_mk_W_dest (p : W P) : P.W_mk (P.W_dest p) = p :=
-by cases p; reflexivity
-
-end pfunctor
 
 /-
 Quotients of polynomial functors.
@@ -293,102 +241,6 @@ end
 
 end qpf
 
-/- Axiomatize the M construction for now -/
-
--- TODO: needed only because we axiomatize M
-noncomputable theory
-
-namespace pfunctor
-
-axiom M (P : pfunctor.{u}) : Type u
-
--- TODO: are the universe ascriptions correct?
-variables {P : pfunctor.{u}} {α : Type u} 
-
-axiom M_dest : M P → P.apply (M P)
-
-axiom M_corec : (α → P.apply α) → (α → M P)
-
-axiom M_dest_corec (g : α → P.apply α) (x : α) :
-  M_dest (M_corec g x) = M_corec g <$> g x
-
-axiom M_bisim {α : Type*} (R : M P → M P → Prop)
-    (h : ∀ x y, R x y → ∃ a f f', 
-      M_dest x = ⟨a, f⟩ ∧ 
-      M_dest y = ⟨a, f'⟩ ∧ 
-      ∀ i, R (f i) (f' i)) :
-  ∀ x y, R x y → x = y 
-
-theorem M_bisim' {α : Type*} (Q : α → Prop) (u v : α → M P) 
-    (h : ∀ x, Q x → ∃ a f f', 
-      M_dest (u x) = ⟨a, f⟩ ∧ 
-      M_dest (v x) = ⟨a, f'⟩ ∧ 
-      ∀ i, ∃ x', Q x' ∧ f i = u x' ∧ f' i = v x') :
-  ∀ x, Q x → u x = v x :=
-λ x Qx,
-let R := λ w z : M P, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
-@M_bisim P (M P) R 
-  (λ x y ⟨x', Qx', xeq, yeq⟩, 
-    let ⟨a, f, f', ux'eq, vx'eq, h'⟩ := h x' Qx' in
-      ⟨a, f, f', xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, h'⟩)
-  _ _ ⟨x, Qx, rfl, rfl⟩ 
-
--- for the record, show M_bisim follows from M_bisim'
-theorem M_bisim_equiv (R : M P → M P → Prop)
-    (h : ∀ x y, R x y → ∃ a f f', 
-      M_dest x = ⟨a, f⟩ ∧ 
-      M_dest y = ⟨a, f'⟩ ∧ 
-      ∀ i, R (f i) (f' i)) :
-  ∀ x y, R x y → x = y :=
-λ x y Rxy,
-let Q : M P × M P → Prop := λ p, R p.fst p.snd in
-M_bisim' Q prod.fst prod.snd 
-  (λ p Qp,
-    let ⟨a, f, f', hx, hy, h'⟩ := h p.fst p.snd Qp in
-    ⟨a, f, f', hx, hy, λ i, ⟨⟨f i, f' i⟩, h' i, rfl, rfl⟩⟩)
-  ⟨x, y⟩ Rxy
-
-theorem M_corec_unique (g : α → P.apply α) (f : α → M P)
-    (hyp : ∀ x, M_dest (f x) = f <$> (g x)) :
-  f = M_corec g :=
-begin
-  ext x,
-  apply M_bisim' (λ x, true) _ _ _ _ trivial,
-  clear x,
-  intros x _,
-  cases gxeq : g x with a f',
-  have h₀ : M_dest (f x) = ⟨a, f ∘ f'⟩,
-  { rw [hyp, gxeq, pfunctor.map_eq] },
-  have h₁ : M_dest (M_corec g x) = ⟨a, M_corec g ∘ f'⟩,
-  { rw [M_dest_corec, gxeq, pfunctor.map_eq], },
-  refine ⟨_, _, _, h₀, h₁, _⟩,
-  intro i,
-  exact ⟨f' i, trivial, rfl, rfl⟩ 
-end
-
-def M_mk : P.apply (M P) → M P := M_corec (λ x, M_dest <$> x)
-
-theorem M_mk_M_dest (x : M P) : M_mk (M_dest x) = x :=
-begin
-  apply M_bisim' (λ x, true) (M_mk ∘ M_dest) _ _ _ trivial,
-  clear x, 
-  intros x _,
-  cases Mxeq : M_dest x with a f',
-  have : M_dest (M_mk (M_dest x)) = ⟨a, _⟩,
-  { rw [M_mk, M_dest_corec, Mxeq, pfunctor.map_eq, pfunctor.map_eq] },
-  refine ⟨_, _, _, this, rfl, _⟩,
-  intro i, 
-  exact ⟨f' i, trivial, rfl, rfl⟩ 
-end
-
-theorem M_dest_M_mk (x : P.apply (M P)) : M_dest (M_mk x) = x :=
-begin
-  have : M_mk ∘ M_dest = id := funext M_mk_M_dest,
-  rw [M_mk, M_dest_corec, ←comp_map, ←M_mk, this, id_map, id]
-end
-
-end pfunctor
-
 /-
 Construct the final coalebra to a qpf.
 -/
@@ -574,7 +426,6 @@ def comp : qpf (functor.comp F₂ F₁) :=
 }
 
 end qpf
-
 
 /-
 Quotients. 

@@ -5,7 +5,7 @@ Author: Jeremy Avigad
 
 Multivariate versions of qpf's.
 -/
-import .qpf
+import .pfunctor
 universes u v
 
 namespace eq
@@ -394,7 +394,6 @@ let g  : P.last.B a → P.last.W  := λ i, (f i).fst,
     g' : P.W_path ⟨a, g⟩ ⟹ α := P.W_path_cases_on f' (λ i, (f i).snd) in
 ⟨⟨a, g⟩, g'⟩
 
-
 def W_rec {α : typevec n} {C : Type*}
     (g : Π a : P.A, ((P.drop).B a ⟹ α) → ((P.last).B a → P.W α) → ((P.last).B a → C) → C) :
   P.W α → C
@@ -411,7 +410,7 @@ theorem W_rec_eq {α : typevec n} {C : Type*}
 begin
   rw [W_mk, W_rec], dsimp, rw [W_rec_eq'],
   dsimp only [W_path_dest_left_W_path_cases_on, W_path_dest_right_W_path_cases_on],
-  congr; ext i; cases (f i); reflexivity
+  congr; ext1 i; cases (f i); refl
 end
 
 theorem W_ind {α : typevec n} {C : P.W α → Prop}
@@ -451,16 +450,6 @@ by cases x with a f; rw [W_mk', W_dest_W_mk, append_contents_eta]
 
 def W_map {α β : typevec n} (g : α ⟹ β) : P.W α → P.W β :=
 λ x, g <$$> x
-
-/-
-def W_map {α β : typevec n} (g : α ⟹ β) : P.W α → P.W β :=
-P.W_rec (λ a f' f rec, P.W_mk a (g ⊚ f') rec)
-
-theorem W_map_W_mk {α β : typevec n}  (g : α ⟹ β) 
-    (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
-  P.W_map g (P.W_mk a f' f) = P.W_mk a (g ⊚ f') (λ x, P.W_map g (f x)) :=
-P.W_rec_eq _ _ _ _
--/
 
 @[reducible] def apply_append1 {α : typevec n} {β : Type*}
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
@@ -512,9 +501,8 @@ begin
   rw h, 
   rw ←W_map_W_mk_aux, dsimp [W_shape, W_dest''],
   rw [W_path_dest_left_W_path_cases_on, W_path_dest_right_W_path_cases_on],
-  congr,
-  ext i,
-  cases (f i), reflexivity
+  congr; ext1 i,
+  cases (f i), refl
 end
 
 end mvpfunctor
