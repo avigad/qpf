@@ -110,37 +110,49 @@ theorem comp_W_path_cases_on {α β : typevec n} (h : α ⟹ β) {a : P.A} {f : 
   h ⊚ P.W_path_cases_on g' g = P.W_path_cases_on (h ⊚ g') (λ i, h ⊚ g i) :=
 by ext i x; cases x; reflexivity
 
-def W_mvpfunctor : mvpfunctor n :=
+def Wp : mvpfunctor n :=
 { A := P.last.W, B := P.W_path }
 
-def W (α : typevec n) : Type* := P.W_mvpfunctor.apply α
+def W (α : typevec n) : Type* := P.Wp.apply α
 
 instance mvfunctor_W : mvfunctor P.W := by delta W; apply_instance
 
-def W_rec' {α : typevec n} {C : Type*}
+/-
+First, describe operations on `W` as a polynomial functor.
+-/
+
+def Wp_mk {α : typevec n} (a : P.A) (f : P.last.B a → P.last.W) (f' : P.W_path ⟨a, f⟩ ⟹ α) : 
+  P.W α :=
+⟨⟨a, f⟩, f'⟩ 
+
+def Wp_rec {α : typevec n} {C : Type*}
   (g : Π (a : P.A) (f : P.last.B a → P.last.W), 
     (P.W_path ⟨a, f⟩ ⟹ α) → (P.last.B a → C) → C) :
   Π (x : P.last.W) (f' : P.W_path x ⟹ α), C
-| ⟨a, f⟩ f' := g a f f' (λ i, W_rec' (f i) (P.W_path_dest_right f' i))
+| ⟨a, f⟩ f' := g a f f' (λ i, Wp_rec (f i) (P.W_path_dest_right f' i))
 
-theorem W_rec_eq' {α : typevec n} {C : Type*}
+theorem Wp_rec_eq {α : typevec n} {C : Type*}
     (g : Π (a : P.A) (f : P.last.B a → P.last.W), 
       (P.W_path ⟨a, f⟩ ⟹ α) → (P.last.B a → C) → C)
     (a : P.A) (f : P.last.B a → P.last.W) (f' : P.W_path ⟨a, f⟩ ⟹ α) :
-  P.W_rec' g ⟨a, f⟩ f' = g a f f' (λ i, P.W_rec' g (f i) (P.W_path_dest_right f' i)) :=
+  P.Wp_rec g ⟨a, f⟩ f' = g a f f' (λ i, P.Wp_rec g (f i) (P.W_path_dest_right f' i)) :=
 rfl
-
 
 -- Note: we could replace Prop by Type* and obtain a dependent recursor
 
-theorem W_ind' {α : typevec n} {C : Π x : P.last.W, P.W_path x ⟹ α → Prop}
+theorem Wp_ind {α : typevec n} {C : Π x : P.last.W, P.W_path x ⟹ α → Prop}
   (ih : ∀ (a : P.A) (f : P.last.B a → P.last.W) 
     (f' : P.W_path ⟨a, f⟩ ⟹ α), 
       (∀ i : P.last.B a, C (f i) (P.W_path_dest_right f' i)) → C ⟨a, f⟩ f') :
   Π (x : P.last.W) (f' : P.W_path x ⟹ α), C x f'
-| ⟨a, f⟩ f' := ih a f f' (λ i, W_ind' _ _)
+| ⟨a, f⟩ f' := ih a f f' (λ i, Wp_ind _ _)
 
-/- express principles in more convenient form -/
+/- 
+Now think of W as defined inductively by the data ⟨a, f', f⟩ where 
+- `a  : P.A` is the shape of the top node
+- `f' : P.drop.B a ⟹ α` is the contents of the top node
+- `f  : P.last.B a → P.last.W` are the subtrees
+ -/
 
 def W_mk {α : typevec n} (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
   P.W α :=
@@ -155,14 +167,14 @@ def W_rec {α : typevec n} {C : Type*}
   let g' (a : P.A) (f : P.last.B a → P.last.W) (h : P.W_path ⟨a, f⟩ ⟹ α) 
         (h' : P.last.B a → C) : C := 
       g a (P.W_path_dest_left h) (λ i, ⟨f i, P.W_path_dest_right h i⟩) h' in
-  P.W_rec' g' a f'
+  P.Wp_rec g' a f'
 
 theorem W_rec_eq {α : typevec n} {C : Type*} 
     (g : Π a : P.A, ((P.drop).B a ⟹ α) → ((P.last).B a → P.W α) → ((P.last).B a → C) → C)
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
   P.W_rec g (P.W_mk a f' f) = g a f' f (λ i, P.W_rec g (f i)) :=
 begin
-  rw [W_mk, W_rec], dsimp, rw [W_rec_eq'],
+  rw [W_mk, W_rec], dsimp, rw [Wp_rec_eq],
   dsimp only [W_path_dest_left_W_path_cases_on, W_path_dest_right_W_path_cases_on],
   congr; ext1 i; cases (f i); refl
 end
@@ -173,7 +185,7 @@ theorem W_ind {α : typevec n} {C : P.W α → Prop}
   ∀ x, C x :=
 begin
   intro x, cases x with a f,
-  apply @W_ind' n P α (λ a f, C ⟨a, f⟩), dsimp,
+  apply @Wp_ind n P α (λ a f, C ⟨a, f⟩), dsimp,
   intros a f f' ih',
   dsimp [W_mk] at ih, 
   let ih'' := ih a (P.W_path_dest_left f') (λ i, ⟨f i, P.W_path_dest_right f' i⟩),
@@ -219,44 +231,25 @@ begin
   reflexivity
 end
 
-/- TODO: shameless hackery here. Clean this up. -/
-
-def W_shape : P.last.W → P.A
-| ⟨a, f⟩ := a
-
-def W_dest'' {α : typevec n} : Π (a : P.last.W) (f' : P.W_path a ⟹ α),
-  (P.drop.B (P.W_shape a) ⟹ α) × (P.last.B (P.W_shape a) → P.W α)
-| ⟨a, f⟩ f' := (P.W_path_dest_left f', λ i, ⟨f i, P.W_path_dest_right f' i⟩)
-
-theorem W_map_W_mk_aux {α β : typevec n} (a : P.last.W) (f' : P.W_path a ⟹ α) 
-    (g : α ⟹ β) :
-  P.W_mk (P.W_shape a) (g ⊚ (P.W_dest'' a f').fst) 
-      (mvfunctor.map g ∘ (P.W_dest'' a f').snd) = ⟨a, g ⊚ f'⟩ :=
-begin
-  induction a with a f ih,
-  dsimp [W_shape, W_dest''] at *,
-  rw [W_mk], dsimp,
-  congr, 
-  transitivity
-    W_path_cases_on P (g ⊚ W_path_dest_left P f')
-      (λ (i : (last P).B a), g ⊚ (W_path_dest_right P f' i)),
-  { reflexivity },
-  rw [←comp_W_path_cases_on],
-  congr,
-  apply W_path_cases_on_eta
-end
+theorem W_mk_eq {α : typevec n} (a : P.A) (f : P.last.B a → P.last.W) 
+    (g' : P.drop.B a ⟹ α) (g : Π j : P.last.B a, P.W_path (f j) ⟹ α) :
+  P.W_mk a g' (λ i, ⟨f i, g i⟩) = 
+    ⟨⟨a, f⟩, P.W_path_cases_on g' g⟩ := rfl
 
 theorem W_map_W_mk {α β : typevec n} (g : α ⟹ β) 
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
   g <$$> P.W_mk a f' f = P.W_mk a (g ⊚ f') (λ i, g <$$> f i) :=
 begin
-  conv { to_lhs, rw [W_mk], dsimp},
-  have h := mvpfunctor.map_eq P.W_mvpfunctor g,
-  rw h, 
-  rw ←W_map_W_mk_aux, dsimp [W_shape, W_dest''],
-  rw [W_path_dest_left_W_path_cases_on, W_path_dest_right_W_path_cases_on],
-  congr; ext1 i,
-  cases (f i), refl
+  show _ = P.W_mk a (g ⊚ f') (mvfunctor.map g ∘ f),
+  have : mvfunctor.map g ∘ f = λ i, ⟨(f i).fst, g ⊚ ((f i).snd)⟩,
+  { ext i, dsimp [function.comp], cases (f i), refl },
+  rw this,
+  have : f = λ i, ⟨(f i).fst, (f i).snd⟩,
+  { ext1, cases (f x), refl },
+  rw this, dsimp,
+  rw [W_mk_eq, W_mk_eq],
+  have h := mvpfunctor.map_eq P.Wp g,
+  rw [h, comp_W_path_cases_on]
 end
 
 end mvpfunctor
@@ -301,7 +294,7 @@ instance is_lawful_mvfunctor : is_lawful_mvfunctor F :=
 end mvqpf
 
 /-
-Consruct fix.
+Construct fix.
 -/
 
 namespace mvqpf
@@ -524,7 +517,7 @@ end
 
 instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
 {
-  P         := q.P.W_mvpfunctor,
+  P         := q.P.Wp,
   abs       := λ α, quot.mk Wequiv,
   repr'     := λ α, fix_to_W,
   abs_repr' := by { intros α, apply quot.ind, intro a, apply quot.sound, apply Wrepr_equiv },

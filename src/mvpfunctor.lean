@@ -41,4 +41,3 @@ theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) :
 | ⟨a, h⟩ := rfl
 
 end mvpfunctor
-
