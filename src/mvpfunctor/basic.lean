@@ -7,7 +7,7 @@ Multivariate polynomial functors.
 
 Note: eventually the W and M constructions as multivariate polynomial functors will go here.
 -/
-import .mvfunctor
+import ..mvfunctor
 universe u
 
 /-

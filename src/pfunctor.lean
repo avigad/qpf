@@ -84,3 +84,21 @@ by { simp [apply.iget],
      cases x, refl, rw h, refl }
 
 end pfunctor
+
+/-
+Composition of polynomial functors.
+-/
+
+namespace pfunctor
+
+/-
+def comp : pfunctor.{u} → pfunctor.{u} → pfunctor.{u}
+| ⟨A₂, B₂⟩ ⟨A₁, B₁⟩ := ⟨Σ a₂ : A₂, B₂ a₂ → A₁, λ ⟨a₂, a₁⟩, Σ u : B₂ a₂, B₁ (a₁ u)⟩ 
+-/
+
+def comp (P₂ P₁ : pfunctor.{u}) : pfunctor.{u} :=
+⟨ Σ a₂ : P₂.1, P₂.2 a₂ → P₁.1, 
+  λ a₂a₁, Σ u : P₂.2 a₂a₁.1, P₁.2 (a₂a₁.2 u) ⟩ 
+
+end pfunctor
+
