@@ -199,37 +199,8 @@ theorem W_cases {α : typevec n} {C : P.W α → Prop}
   ∀ x, C x :=
 P.W_ind (λ a f' f ih', ih a f' f)
 
-def W_dest {α : typevec n} : P.W α → P.apply (α.append1 (P.W α)) :=
-P.W_rec (λ a f' f _, ⟨a, P.append_contents f' f⟩)
-
-theorem W_dest_W_mk {α : typevec n} 
-    (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
-  P.W_dest (P.W_mk a f' f) = ⟨a, P.append_contents f' f⟩ :=
-by rw [W_dest, W_rec_eq]
-
-def W_mk' {α : typevec n} : P.apply (α.append1 (P.W α)) → P.W α
-| ⟨a, f⟩ := P.W_mk a (P.contents_dest_left f) (P.contents_dest_right f)
-
-theorem W_dest_W_mk' {α : typevec n} (x : P.apply (α.append1 (P.W α))) :
-  P.W_dest (P.W_mk' x) = x :=
-by cases x with a f; rw [W_mk', W_dest_W_mk, append_contents_eta]
-
 def W_map {α β : typevec n} (g : α ⟹ β) : P.W α → P.W β :=
 λ x, g <$$> x
-
-@[reducible] def apply_append1 {α : typevec n} {β : Type*}
-    (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.apply (append1 α β) :=
-⟨a, P.append_contents f' f⟩ 
-
-theorem map_apply_append1 {α γ : typevec n} (g : α ⟹ γ)
-  (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
-append_fun g (P.W_map g) <$$> P.apply_append1 a f' f = 
-  P.apply_append1 a (g ⊚ f') (λ x, P.W_map g (f x)) :=
-begin
-  rw [apply_append1, apply_append1, append_contents, append_contents, map_eq, append_fun_comp],
-  reflexivity
-end
 
 theorem W_mk_eq {α : typevec n} (a : P.A) (f : P.last.B a → P.last.W) 
     (g' : P.drop.B a ⟹ α) (g : Π j : P.last.B a, P.W_path (f j) ⟹ α) :
@@ -251,6 +222,43 @@ begin
   have h := mvpfunctor.map_eq P.Wp g,
   rw [h, comp_W_path_cases_on]
 end
+
+-- TODO: this technical theorem is used in one place below. Can it be avoided?
+
+@[reducible] def apply_append1 {α : typevec n} {β : Type*}
+    (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
+  P.apply (append1 α β) :=
+⟨a, P.append_contents f' f⟩ 
+
+theorem map_apply_append1 {α γ : typevec n} (g : α ⟹ γ)
+  (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
+append_fun g (P.W_map g) <$$> P.apply_append1 a f' f = 
+  P.apply_append1 a (g ⊚ f') (λ x, P.W_map g (f x)) :=
+begin
+  rw [apply_append1, apply_append1, append_contents, append_contents, map_eq, append_fun_comp],
+  reflexivity
+end
+
+/-
+Yet another view of the W type: as a fixed point for a multivariate polynomial functor.
+These are needs to use the W-construction to construct a fixed point of a qpf, since
+the qpf axioms are expressed in terms of `map` on `P`.
+-/
+
+def W_mk' {α : typevec n} : P.apply (α.append1 (P.W α)) → P.W α
+| ⟨a, f⟩ := P.W_mk a (P.contents_dest_left f) (P.contents_dest_right f)
+
+def W_dest' {α : typevec n} : P.W α → P.apply (α.append1 (P.W α)) :=
+P.W_rec (λ a f' f _, ⟨a, P.append_contents f' f⟩)
+
+theorem W_dest'_W_mk {α : typevec n} 
+    (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
+  P.W_dest' (P.W_mk a f' f) = ⟨a, P.append_contents f' f⟩ :=
+by rw [W_dest', W_rec_eq]
+
+theorem W_dest'_W_mk' {α : typevec n} (x : P.apply (α.append1 (P.W α))) :
+  P.W_dest' (P.W_mk' x) = x :=
+by cases x with a f; rw [W_mk', W_dest'_W_mk, append_contents_eta]
 
 end mvpfunctor
 
@@ -314,11 +322,11 @@ by rw [recF, mvpfunctor.W_rec_eq]
 
 theorem recF_eq' {α : typevec n} {β : Type*} (g : F (α.append1 β) → β) 
     (x : q.P.W α) :
-  recF g x = g (abs ((append_fun id (recF g)) <$$> q.P.W_dest x)) :=
+  recF g x = g (abs ((append_fun id (recF g)) <$$> q.P.W_dest' x)) :=
 begin
   apply q.P.W_cases _ x,
   intros a f' f,
-  rw [recF_eq, q.P.W_dest_W_mk, mvpfunctor.map_eq, mvpfunctor.append_fun_comp_append_contents,
+  rw [recF_eq, q.P.W_dest'_W_mk, mvpfunctor.map_eq, mvpfunctor.append_fun_comp_append_contents,
     typevec.id_comp]
 end
 
@@ -342,13 +350,13 @@ begin
   intro h, induction h,
   case mvqpf.Wequiv.ind : a f' f₀ f₁ h ih { simp only [recF_eq, function.comp, ih] },
   case mvqpf.Wequiv.abs : a₀ f'₀ f₀ a₁ f'₁ f₁ h ih 
-    { simp only [recF_eq', abs_map, mvpfunctor.W_dest_W_mk, h] },  
+    { simp only [recF_eq', abs_map, mvpfunctor.W_dest'_W_mk, h] },  
   case mvqpf.Wequiv.trans : x y z e₁ e₂ ih₁ ih₂
     { exact eq.trans ih₁ ih₂ } 
 end
 
 theorem Wequiv.abs' {α : typevec n} (x y : q.P.W α) 
-    (h : abs (q.P.W_dest x) = abs (q.P.W_dest y)) :
+    (h : abs (q.P.W_dest' x) = abs (q.P.W_dest' y)) :
   Wequiv x y :=
 begin
   revert h,
@@ -380,14 +388,14 @@ theorem Wrepr_W_mk  {α : typevec n}
     (a : q.P.A) (f' : q.P.drop.B a ⟹ α) (f : q.P.last.B a → q.P.W α) :
   Wrepr (q.P.W_mk a f' f) = 
     q.P.W_mk' (repr (abs ((append_fun id Wrepr) <$$> ⟨a, q.P.append_contents f' f⟩))) :=
-by rw [Wrepr, recF_eq', q.P.W_dest_W_mk]
+by rw [Wrepr, recF_eq', q.P.W_dest'_W_mk]
 
 theorem Wrepr_equiv {α : typevec n} (x : q.P.W α) : Wequiv (Wrepr x) x :=
 begin
   apply q.P.W_ind _ x, intros a f' f ih,
   apply Wequiv.trans _ (q.P.W_mk' ((append_fun id Wrepr) <$$> ⟨a, q.P.append_contents f' f⟩)),
   { apply Wequiv.abs',
-    rw [Wrepr_W_mk, q.P.W_dest_W_mk', q.P.W_dest_W_mk', abs_repr] },
+    rw [Wrepr_W_mk, q.P.W_dest'_W_mk', q.P.W_dest'_W_mk', abs_repr] },
   rw [q.P.map_eq, mvpfunctor.W_mk', q.P.append_fun_comp_append_contents, id_comp,
       q.P.contents_dest_left_append_contents, q.P.contents_dest_right_append_contents],
   apply Wequiv.ind, exact ih
@@ -450,7 +458,7 @@ have recF g ∘ fix_to_W = fix.rec g,
 begin
   conv { to_lhs, rw [fix.rec, fix.mk], dsimp },
   cases h : repr x with a f,
-  rw [mvpfunctor.map_eq, recF_eq', ←mvpfunctor.map_eq, mvpfunctor.W_dest_W_mk'],
+  rw [mvpfunctor.map_eq, recF_eq', ←mvpfunctor.map_eq, mvpfunctor.W_dest'_W_mk'],
   rw [←mvpfunctor.comp_map, abs_map, ←h, abs_repr, ←append_fun_comp, id_comp, this]
 end
 
@@ -459,8 +467,8 @@ theorem fix.ind_aux (a : q.P.A) (f' : q.P.drop.B a ⟹ α) (f : q.P.last.B a →
 have fix.mk (abs ⟨a, q.P.append_contents f' (λ x, ⟦f x⟧)⟩) = ⟦Wrepr (q.P.W_mk a f' f)⟧,
   begin
     apply quot.sound, apply Wequiv.abs',
-    rw [mvpfunctor.W_dest_W_mk', abs_map, abs_repr, ←abs_map, mvpfunctor.map_eq],
-    conv { to_rhs, rw [Wrepr_W_mk, q.P.W_dest_W_mk', abs_repr, mvpfunctor.map_eq] },
+    rw [mvpfunctor.W_dest'_W_mk', abs_map, abs_repr, ←abs_map, mvpfunctor.map_eq],
+    conv { to_rhs, rw [Wrepr_W_mk, q.P.W_dest'_W_mk', abs_repr, mvpfunctor.map_eq] },
     congr' 2, rw [mvpfunctor.append_contents, mvpfunctor.append_contents],
     rw [←typevec.comp_assoc, ←append_fun_comp, ←typevec.comp_assoc, ←append_fun_comp],
     reflexivity
