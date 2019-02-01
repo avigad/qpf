@@ -7,7 +7,7 @@ Basic machinery for defining general coinductive types
 
 Work in progress
 -/
-import data.pfun tactic.interactive for_mathlib .pfunctor
+import data.pfun tactic.interactive for_mathlib pfunctor
 
 universes u v w
 
@@ -133,104 +133,10 @@ begin
     apply n_ih (truncate ∘ f₀),
     rw h₂,
     cases H,
-    congr, funext j, unfold comp,
+    congr, funext j, dsimp [comp],
     rw truncate_eq_of_agree,
     apply H_a_1 }
 end
-
--- lemma agree_of_mem_subtree' (ps : path F) {f g : Π n : ℕ, cofix_a F n}
---  (Hg : all_agree g)
---  (Hsub : ∀ (x : ℕ), f x ∈ subtree' ps (g (x + list.length ps)))
--- : all_agree f :=
--- begin
---   revert f g,
---   induction ps
---   ; introv Hg Hsub,
---   { simp [subtree'] at *, simp [*,all_agree], apply_assumption, },
---   { intro n,
---     induction n with n, simp,
---     have Hg_succ_n := Hg (succ n),
---     cases ps_hd with y i,
---     have : ∀ n, y = (head' (g (succ n))),
---     { intro j, specialize Hsub 0,
---       cases Hk : g (0 + length (sigma.mk y i :: ps_tl)) with _ y₂ ch₂,
---       have Hsub' := Hsub,
---       rw Hk at Hsub,
---       simp at Hsub, cases Hsub, subst y,
---       change head' (cofix_a.intro y₂ ch₂) = _,
---       rw ← Hk,
---       apply head_succ' _ _ g Hg, },
---     let g' := λ n, children' (g $ succ n) (cast (by rw this) i),
---     apply @ps_ih _ g',
---     { simp [g',all_agree], clear_except Hg,
---       intro,
---       generalize Hj : cast _ i = j,
---       generalize Hk : cast _ i = k,
---       have Hjk : j == k, cc, clear Hj Hk,
---       specialize Hg (succ n),
---       cases (g (succ n)), cases (g (succ (succ n))),
---       simp [children'], simp [agree] at Hg,
---       apply Hg.2 _ _ Hjk, },
---     intro k,
---     have Hsub_k := Hsub (k),
---     cases Hk_succ : g (k + length (sigma.mk y i :: ps_tl)) with _ y₂ ch₂,
---     simp [Hk_succ] at Hsub_k,
---     cases Hsub_k with _ Hsub_k, subst y,
---     simp [g'],
---     refine cast _ Hsub_k,
---     congr,
---     change g (succ $ k + length ps_tl) = _ at Hk_succ,
---     generalize Hj : cast _ i = j,
---     generalize Hk : cast _ i = k,
---     have Hjk : j == k, cc, clear Hj Hk,
---     revert k Hk_succ,
---     clear_except Hg, generalize : (g (succ (k + length ps_tl))) = z,
---     intros, subst z, simp [children'], cases Hjk, refl }
--- end
-
--- @[simp]
--- lemma roption.get_return {α} (x : α) (H)
--- : roption.get (return x) H = x :=
--- rfl
-
--- lemma ext_aux {n : ℕ} (x y : cofix_a β (succ n)) (z : cofix_a β n)
---   (hx : agree z x)
---   (hy : agree z y)
---   (hrec : ∀ (ps : path β),
---              (select' x ps).dom →
---              (select' y ps).dom →
---              n = ps.length →
---             (select' x ps) = (select' y ps))
--- : x = y :=
--- begin
---   induction n with n,
---   { cases x, cases y, cases z,
---     suffices : x_a = y_a,
---     { congr, assumption, subst y_a, simp,
---       funext i, cases x_a_1 i, cases y_a_1 i, refl },
---     clear hx hy,
---     specialize hrec [] trivial trivial rfl,
---     simpa [select'] using hrec },
---   { cases x, cases y, cases z,
---     have : y_a = z_a,
---     { simp [agree] at hx hy, cc, },
---     have : x_a = y_a,
---     { simp [agree] at hx hy, cc, },
---     subst x_a, subst z_a, congr,
---     funext i, simp [agree] at hx hy,
---     apply n_ih _ _ (z_a_1 i),
---     { apply hx _ _ rfl },
---     { apply hy _ _ rfl },
---     { intros,
---       have : succ n = 1 + length ps,
---       { simp [*,one_add], },
---       have Hselect : ∀ (x_a_1 : β y_a → cofix_a β (succ n)),
---         (select' (cofix_a.intro y_a x_a_1) (⟨y_a, i⟩ :: ps)) = (select' (x_a_1 i) ps),
---       { rw this, simp [select_cons'], },
---       specialize hrec (⟨ y_a, i⟩ :: ps) _ _ (♯ this)
---       ; try { simp [Hselect,*], },
---       { simp [select',assert_if_pos] at hrec, exact hrec }, }, }
--- end
 
 end approx
 open approx
@@ -803,9 +709,6 @@ begin
   have : M_mk ∘ M_dest = id := funext M_mk_M_dest,
   rw [M_mk, M_dest_corec, ←comp_map, ←M_mk, this, id_map, id]
 end
-
--- def corec₀ {X : Type u} (F : X → P.apply X) : X → M P :=
--- M_corec _ _ _ (λ i, to_rep $ F i)
 
 def corec₁ {α : Type u} (F : Π X, (α → X) → α → P.apply X) : α → M P :=
 M_corec (F _ id)

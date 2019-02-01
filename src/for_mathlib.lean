@@ -359,4 +359,17 @@ do let ns := name_set.of_list xs,
 
 meta def splita := split; [skip, assumption]
 
+@[hole_command]
+meta def whnf_type_hole : hole_command :=
+{ name := "Reduce expected type",
+  descr := "Reduce expected type",
+  action := λ es,
+    do t ← match es with
+           | [h] := to_expr h >>= infer_type >>= whnf
+           | [] := target >>= whnf
+           | _ := fail "too many expressions"
+           end,
+       trace t,
+       pure [] }
+
 end tactic.interactive

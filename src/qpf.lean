@@ -22,7 +22,7 @@ The main goal is to construct:
 We also show that the composition of qpfs is a qpf, and that the quotient of a qpf
 is a qpf.
 -/
-import tactic.interactive data.multiset .M
+import tactic.interactive data.multiset M
 universe u
 
 /-
@@ -43,7 +43,7 @@ end quot
 /-
 Quotients of polynomial functors.
 
-Roughly speaking, saying that `F` is a quotient of a polynomial functor means that for each `α`, 
+Roughly speaking, saying that `F` is a quotient of a polynomial functor means that for each `α`,
 elements of `F α` are represented by pairs `⟨a, f⟩`, where `a` is the shape of the object and
 `f` indexes the relevant elements of `α`, in a suitably natural manner.
 -/
@@ -61,21 +61,21 @@ include q
 
 attribute [simp] abs_repr
 
-/- 
-Show that every qpf is a lawful functor. 
+/-
+Show that every qpf is a lawful functor.
 
-Note: every functor has a field, map_comp, and is_lawful_functor has the defining 
-characterization. We can only propagate the assumption. 
+Note: every functor has a field, map_comp, and is_lawful_functor has the defining
+characterization. We can only propagate the assumption.
 -/
 
 theorem id_map {α : Type*} (x : F α) : id <$> x = x :=
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map], reflexivity }
 
-theorem comp_map {α β γ : Type*} (f : α → β) (g : β → γ) (x : F α) : 
+theorem comp_map {α β γ : Type*} (f : α → β) (g : β → γ) (x : F α) :
   (g ∘ f) <$> x = g <$> f <$> x :=
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map, ←abs_map, ←abs_map], reflexivity }
 
-theorem is_lawful_functor 
+theorem is_lawful_functor
   (h : ∀ α β : Type u, @functor.map_const F _ α _ = functor.map ∘ function.const β) : is_lawful_functor F :=
 { map_const_eq := h,
   id_map := @id_map F _ _,
@@ -100,7 +100,7 @@ theorem recF_eq' {α : Type*} (g : F α → α) (a : q.P.A) (f : q.P.B a → q.P
 rfl
 
 /-- two trees are equivalent if their F-abstractions are -/
-inductive Wequiv : q.P.W → q.P.W → Prop 
+inductive Wequiv : q.P.W → q.P.W → Prop
 | ind (a : q.P.A) (f f' : q.P.B a → q.P.W) :
     (∀ x, Wequiv (f x) (f' x)) → Wequiv ⟨a, f⟩ ⟨a, f'⟩
 | abs (a : q.P.A) (f : q.P.B a → q.P.W) (a' : q.P.A) (f' : q.P.B a' → q.P.W) :
@@ -115,7 +115,7 @@ begin
   intro h, induction h,
   case qpf.Wequiv.ind : a f f' h ih
     { simp only [recF_eq', pfunctor.map_eq, function.comp, ih] },
-  case qpf.Wequiv.abs : a f a' f' h ih 
+  case qpf.Wequiv.abs : a f a' f' h ih
     { simp only [recF_eq', abs_map, h] },
   case qpf.Wequiv.trans : x y z e₁ e₂ ih₁ ih₂
     { exact eq.trans ih₁ ih₂ }
@@ -125,16 +125,16 @@ theorem Wequiv.abs' (x y : q.P.W) (h : abs (q.P.W_dest x) = abs (q.P.W_dest y)) 
   Wequiv x y :=
 by { cases x, cases y, apply Wequiv.abs, apply h }
 
-theorem Wequiv.refl (x : q.P.W) : Wequiv x x := 
+theorem Wequiv.refl (x : q.P.W) : Wequiv x x :=
 by cases x with a f; exact Wequiv.abs a f a f rfl
 
 theorem Wequiv.symm (x y : q.P.W) : Wequiv x y → Wequiv y x :=
 begin
   cases x with a f, cases y with b g,
   intro h, induction h,
-  case qpf.Wequiv.ind : a f f' h ih 
+  case qpf.Wequiv.ind : a f f' h ih
     { exact Wequiv.ind _ _ _ ih },
-  case qpf.Wequiv.abs : a f a' f' h ih 
+  case qpf.Wequiv.abs : a f a' f' h ih
     { exact Wequiv.abs _ _ _ _ h.symm },
   case qpf.Wequiv.trans : x y z e₁ e₂ ih₁ ih₂
     { exact qpf.Wequiv.trans _ _ _ ih₂ ih₁}
@@ -149,7 +149,7 @@ begin
   apply Wequiv.trans,
   { change Wequiv (Wrepr ⟨a, f⟩) (q.P.W_mk (Wrepr <$> ⟨a, f⟩)),
     apply Wequiv.abs',
-    have : Wrepr ⟨a, f⟩ = q.P.W_mk (repr (abs (Wrepr <$> ⟨a, f⟩))) := rfl, 
+    have : Wrepr ⟨a, f⟩ = q.P.W_mk (repr (abs (Wrepr <$> ⟨a, f⟩))) := rfl,
     rw [this, pfunctor.W_dest_W_mk, abs_repr],
     reflexivity },
   apply Wequiv.ind, exact ih
@@ -160,7 +160,7 @@ Define the fixed point as the quotient of trees under the equivalence relation.
 -/
 
 def W_setoid : setoid q.P.W :=
-⟨Wequiv, @Wequiv.refl _ _ _, @Wequiv.symm _ _ _, @Wequiv.trans _ _ _⟩ 
+⟨Wequiv, @Wequiv.refl _ _ _, @Wequiv.symm _ _ _, @Wequiv.trans _ _ _⟩
 
 local attribute [instance] W_setoid
 
@@ -169,7 +169,7 @@ def fix (F : Type u → Type u) [functor F] [q : qpf F]:= quotient (W_setoid : s
 def fix.rec {α : Type*} (g : F α → α) : fix F → α :=
 quot.lift (recF g) (recF_eq_of_Wequiv g)
 
-def fix_to_W : fix F → q.P.W := 
+def fix_to_W : fix F → q.P.W :=
 quotient.lift Wrepr (recF_eq_of_Wequiv (λ x, q.P.W_mk (repr x)))
 
 def fix.mk (x : F (fix F)) : fix F := quot.mk _ (q.P.W_mk (fix_to_W <$> repr x))
@@ -178,8 +178,8 @@ def fix.dest : fix F → F (fix F) := fix.rec (functor.map fix.mk)
 
 theorem fix.rec_eq {α : Type*} (g : F α → α) (x : F (fix F)) :
   fix.rec g (fix.mk x) = g (fix.rec g <$> x) :=
-have recF g ∘ fix_to_W = fix.rec g, 
-  by { apply funext, apply quotient.ind, intro x, apply recF_eq_of_Wequiv, 
+have recF g ∘ fix_to_W = fix.rec g,
+  by { apply funext, apply quotient.ind, intro x, apply recF_eq_of_Wequiv,
        apply Wrepr_equiv },
 begin
   conv { to_lhs, rw [fix.rec, fix.mk], dsimp },
@@ -195,11 +195,11 @@ have fix.mk (abs ⟨a, λ x, ⟦f x⟧⟩) = ⟦Wrepr ⟨a, f⟩⟧,
     apply quot.sound, apply Wequiv.abs',
     rw [pfunctor.W_dest_W_mk, abs_map, abs_repr, ←abs_map, pfunctor.map_eq],
     conv { to_rhs, simp only [Wrepr, recF_eq, pfunctor.W_dest_W_mk, abs_repr] },
-    reflexivity 
+    reflexivity
   end,
 by { rw this, apply quot.sound, apply Wrepr_equiv }
 
-theorem fix.ind {α : Type*} (g₁ g₂ : fix F → α) 
+theorem fix.ind {α : Type*} (g₁ g₂ : fix F → α)
     (h : ∀ x : F (fix F), g₁ <$> x = g₂ <$> x → g₁ (fix.mk x) = g₂ (fix.mk x)) :
   ∀ x, g₁ x = g₂ x :=
 begin
@@ -210,7 +210,7 @@ begin
   rw [←fix.ind_aux a f], apply h,
   rw [←abs_map, ←abs_map, pfunctor.map_eq, pfunctor.map_eq],
   dsimp [function.comp],
-  congr, ext x, apply ih 
+  congr, ext x, apply ih
 end
 
 theorem fix.rec_unique {α : Type*} (g : F α → α) (h : fix F → α)
@@ -261,7 +261,7 @@ by rw [corecF, pfunctor.M_dest_corec]
 
 /- A pre-congruence on q.P.M *viewed as an F-coalgebra*. Not necessarily symmetric. -/
 def is_precongr (r : q.P.M → q.P.M → Prop) : Prop :=
-  ∀ ⦃x y⦄, r x y → 
+  ∀ ⦃x y⦄, r x y →
     abs (quot.mk r <$> pfunctor.M_dest x) = abs (quot.mk r <$> pfunctor.M_dest y)
 
 /- The maximal congruence on q.P.M -/
@@ -274,8 +274,8 @@ def cofix.corec {α : Type*} (g : α → F α) : α → cofix F :=
 λ x, quot.mk  _ (corecF g x)
 
 def cofix.dest : cofix F → F (cofix F) :=
-quot.lift 
-  (λ x, quot.mk Mcongr <$> (abs (pfunctor.M_dest x))) 
+quot.lift
+  (λ x, quot.mk Mcongr <$> (abs (pfunctor.M_dest x)))
   begin
     rintros x y ⟨r, pr, rxy⟩, dsimp,
     have : ∀ x y, r x y → Mcongr x y,
@@ -287,8 +287,8 @@ quot.lift
 theorem cofix.dest_corec {α : Type u} (g : α → F α) (x : α) :
   cofix.dest (cofix.corec g x) = cofix.corec g <$> g x :=
 begin
-  conv { to_lhs, rw [cofix.dest, cofix.corec] }, dsimp, 
-  rw [corecF_eq, abs_map, abs_repr, ←comp_map], reflexivity 
+  conv { to_lhs, rw [cofix.dest, cofix.corec] }, dsimp,
+  rw [corecF_eq, abs_map, abs_repr, ←comp_map], reflexivity
 end
 
 private theorem cofix.bisim_aux
@@ -298,26 +298,26 @@ private theorem cofix.bisim_aux
   ∀ x y, r x y → x = y :=
 begin
   intro x, apply quot.induction_on x, clear x,
-  intros x y, apply quot.induction_on y, clear y, 
+  intros x y, apply quot.induction_on y, clear y,
   intros y rxy,
   apply quot.sound,
   let r' := λ x y, r (quot.mk _ x) (quot.mk _ y),
   have : is_precongr r',
   { intros a b r'ab,
-    have  h₀: quot.mk r <$> quot.mk Mcongr <$> abs (pfunctor.M_dest a) = 
+    have  h₀: quot.mk r <$> quot.mk Mcongr <$> abs (pfunctor.M_dest a) =
               quot.mk r <$> quot.mk Mcongr <$> abs (pfunctor.M_dest b) := h _ _ r'ab,
     have h₁ : ∀ u v : q.P.M, Mcongr u v → quot.mk r' u = quot.mk r' v,
     { intros u v cuv, apply quot.sound, dsimp [r'], rw quot.sound cuv, apply h' },
-    let f : quot r → quot r' := quot.lift (quot.lift (quot.mk r') h₁) 
+    let f : quot r → quot r' := quot.lift (quot.lift (quot.mk r') h₁)
       begin
         intro c, apply quot.induction_on c, clear c,
         intros c d, apply quot.induction_on d, clear d,
         intros d rcd, apply quot.sound, apply rcd
-      end, 
+      end,
     have : f ∘ quot.mk r ∘ quot.mk Mcongr = quot.mk r' := rfl,
-    rw [←this, pfunctor.comp_map _ _ f, pfunctor.comp_map _ _ (quot.mk r), 
+    rw [←this, pfunctor.comp_map _ _ f, pfunctor.comp_map _ _ (quot.mk r),
           abs_map, abs_map, abs_map, h₀],
-    rw [pfunctor.comp_map _ _ f, pfunctor.comp_map _ _ (quot.mk r), 
+    rw [pfunctor.comp_map _ _ f, pfunctor.comp_map _ _ (quot.mk r),
           abs_map, abs_map, abs_map] },
   refine ⟨r', this, rxy⟩
 end
@@ -331,7 +331,7 @@ begin
   intros x y rxy,
   apply cofix.bisim_aux r',
   { intro x, left, reflexivity },
-  { intros x y r'xy, 
+  { intros x y r'xy,
     cases r'xy, { rw r'xy },
     have : ∀ x y, r x y → r' x y := λ x y h, or.inr h,
     rw ←quot.factor_mk_eq _ _ this, dsimp,
@@ -341,10 +341,10 @@ begin
 end
 
 /-
-TODO: 
+TODO:
 - define other two versions of relation lifting (via subtypes, via P)
 - derive other bisimulation principles.
-- define mk and prove identities. 
+- define mk and prove identities.
 -/
 
 end qpf
@@ -362,10 +362,10 @@ include q₂ q₁
 def comp : qpf (functor.comp F₂ F₁) :=
 { P := pfunctor.comp (q₂.P) (q₁.P),
   abs := λ α,
-    begin 
+    begin
       dsimp [functor.comp],
       intro p,
-      exact abs ⟨p.1.1, λ x, abs ⟨p.1.2 x, λ y, p.2 ⟨x, y⟩⟩⟩ 
+      exact abs ⟨p.1.1, λ x, abs ⟨p.1.2 x, λ y, p.2 ⟨x, y⟩⟩⟩
     end,
   repr := λ α,
     begin
@@ -389,7 +389,7 @@ def comp : qpf (functor.comp F₂ F₁) :=
       cases h' : repr (f x) with b g,
       dsimp, rw [←h', abs_repr] }
     end,
-  abs_map := λ α β f, 
+  abs_map := λ α β f,
     begin
       abstract {
       dsimp [functor.comp, pfunctor.comp],
@@ -415,7 +415,7 @@ def comp : qpf (functor.comp F₂ F₁) :=
 end qpf
 
 /-
-Quotients. 
+Quotients.
 
 We show that if `F` is a qpf and `G` is a suitable quotient of `F`, then `G` is a qpf.
 -/
@@ -426,7 +426,7 @@ variables {G : Type u → Type u} [functor G]
 variable  {FG_abs  : Π {α}, F α → G α}
 variable  {FG_repr : Π {α}, G α → F α}
 
-def quotient_qpf 
+def quotient_qpf
     (FG_abs_repr : Π {α} (x : G α), FG_abs (FG_repr x) = x)
     (FG_abs_map  : ∀ {α β} (f : α → β) (x : F α), FG_abs (f <$> x) = f <$> FG_abs x) :
   qpf G :=

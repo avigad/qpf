@@ -93,12 +93,17 @@ namespace pfunctor
 
 /-
 def comp : pfunctor.{u} → pfunctor.{u} → pfunctor.{u}
-| ⟨A₂, B₂⟩ ⟨A₁, B₁⟩ := ⟨Σ a₂ : A₂, B₂ a₂ → A₁, λ ⟨a₂, a₁⟩, Σ u : B₂ a₂, B₁ (a₁ u)⟩ 
+| ⟨A₂, B₂⟩ ⟨A₁, B₁⟩ := ⟨Σ a₂ : A₂, B₂ a₂ → A₁, λ ⟨a₂, a₁⟩, Σ u : B₂ a₂, B₁ (a₁ u)⟩
 -/
 
 def comp (P₂ P₁ : pfunctor.{u}) : pfunctor.{u} :=
-⟨ Σ a₂ : P₂.1, P₂.2 a₂ → P₁.1, 
-  λ a₂a₁, Σ u : P₂.2 a₂a₁.1, P₁.2 (a₂a₁.2 u) ⟩ 
+⟨ Σ a₂ : P₂.1, P₂.2 a₂ → P₁.1,
+  λ a₂a₁, Σ u : P₂.2 a₂a₁.1, P₁.2 (a₂a₁.2 u) ⟩
+
+def comp.mk (P₂ P₁ : pfunctor.{u}) {α : Type} (x : P₂.apply (P₁.apply α)) : (comp P₂ P₁).apply α :=
+⟨ ⟨ x.1, sigma.fst ∘ x.2 ⟩, λ a₂a₁, (x.2 a₂a₁.1).2 a₂a₁.2  ⟩
+
+def comp.get (P₂ P₁ : pfunctor.{u}) {α : Type} (x : (comp P₂ P₁).apply α) : P₂.apply (P₁.apply α) :=
+⟨ x.1.1, λ a₂, ⟨x.1.2 a₂, λ a₁, x.2 ⟨a₂,a₁⟩ ⟩ ⟩
 
 end pfunctor
-
