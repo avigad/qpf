@@ -9,7 +9,7 @@ Note: eventually the W and M constructions as multivariate polynomial functors w
 -/
 import ..mvfunctor
 import for_mathlib
-universe u
+universes u v
 
 /-
 multivariate polynomial functors
@@ -23,7 +23,7 @@ open mvfunctor (liftp liftr)
 
 variables {n m : ℕ} (P : mvpfunctor.{u} n)
 
-def apply (α : typevec.{u} n) : Type* := Σ a : P.A, P.B a ⟹ α
+def apply (α : typevec.{u} n) : Type u := Σ a : P.A, P.B a ⟹ α
 
 def map {α β : typevec n} (f : α ⟹ β) : P.apply α → P.apply β :=
 λ ⟨a, g⟩, ⟨a, typevec.comp f g⟩

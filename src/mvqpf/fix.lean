@@ -6,7 +6,7 @@ Author: Jeremy Avigad
 The initial algebra of a multivariate qpf is again a qpf.
 -/
 import ..mvpfunctor.W .basic
-universe u
+universes u v
 
 namespace mvqpf
 open typevec

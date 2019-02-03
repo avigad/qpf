@@ -3,7 +3,7 @@ Copyright (c) 2018 Simon Hudon. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Author: Simon Hudon
 -/
-import data.pfun category.functor category.applicative
+import data.pfun category.functor category.applicative data.list.sort data.list.basic
 
 universes u v
 
@@ -34,6 +34,22 @@ by cases x; refl
 
 end sigma
 
+namespace list
+
+def zip_with₃ {α β γ φ} (f : α → β → γ → φ) : list α → list β → list γ → list φ
+| (x::xs) (y::ys) (z::zs) := f x y z :: zip_with₃ xs ys zs
+| _ _ _ := []
+
+def mzip_with₃ {m : Type u → Type v} [applicative m] {α β γ φ} (f : α → β → γ → m φ) : list α → list β → list γ → m (list φ)
+| (x::xs) (y::ys) (z::zs) := (::) <$> f x y z <*> mzip_with₃ xs ys zs
+| _ _ _ := pure []
+
+def mzip_with₄ {m : Type u → Type v} [applicative m] {α β γ φ ψ} (f : α → β → γ → φ → m ψ) :
+  list α → list β → list γ → list φ → m (list ψ)
+| (w :: ws) (x::xs) (y::ys) (z::zs) := (::) <$> f w x y z <*> mzip_with₄ ws xs ys zs
+| _ _ _ _ := pure []
+
+end list
 namespace roption
 variables {α : Type*} {β : Type*} {γ : Type*}
 
@@ -181,9 +197,9 @@ end traversable
 /-
 namespace name
 
-def append_suffix : name → string → name
-| (mk_string s n) s' := mk_string (s ++ s') n
-| n _ := n
+-- def append_suffix : name → string → name
+-- | (mk_string s n) s' := mk_string (s ++ s') n
+-- | n _ := n
 
 end name
 -/
@@ -198,7 +214,63 @@ meta def fold_mvar {α} : level → (name → α → α) → α → α
 | (max a b) f := fold_mvar a f ∘ fold_mvar b f
 | (imax a b) f := fold_mvar a f ∘ fold_mvar b f
 
+meta def pred : level → level
+| level.zero := level.zero
+| (level.succ a) := a
+| (level.max a b) := max (pred a) (pred b)
+| (level.imax a b) := max (pred a) (pred b)
+| l@(level.param a) := l
+| l@(level.mvar a) := l
+
+
 end level
+
+namespace declaration
+
+meta def univ_levels (d : declaration) : list level :=
+d.univ_params.map level.param
+
+end declaration
+
+namespace native
+namespace rb_map
+
+-- #check rb_map
+
+variables {key : Type} {val val' : Type}
+
+-- section
+
+variables [has_lt key] [decidable_rel ((<) : key → key → Prop)]
+variables (f : val → val → val)
+
+-- def intersect' : list (key × val) → list (key × val) → list (key × val)
+-- | [] m := []
+-- | ((k,x)::xs) [] := []
+-- | ((k,x)::xs) ((k',x')::xs') :=
+-- if h : k < k' then intersect' xs ((k',x')::xs')
+-- else if k' < k then intersect' ((k,x)::xs) xs'
+-- else (k,f x x') :: intersect' xs xs'
+
+open function (on_fun)
+def sort {α : Type} (f : α → key) : list α → list α := list.merge_sort (on_fun (<) f)
+
+-- end
+
+meta def filter_map (f : key → val → option val') (x : rb_map key val) : rb_map key val' :=
+fold x (mk _ _) $ λa b m', (insert m' a <$> f a b).get_or_else m'
+
+meta def intersect_with (m m' : rb_map key val) : rb_map key val :=
+m.filter_map $ λ k x, f x <$> m'.find k
+
+meta def intersect (x y : rb_map key val) : rb_map key val :=
+intersect_with (function.const val) x y
+
+meta def difference (m m' : rb_map key val) : rb_map key val :=
+m.filter_map (λ k x, guard (¬ m'.contains k) >> pure x)
+
+end rb_map
+end native
 
 namespace expr
 
@@ -209,6 +281,10 @@ meta def const_params : expr → list level
 | (const _ ls) := ls
 | _ := []
 
+meta def sort_univ : expr → level
+| (sort ls) := ls
+| _ := level.zero
+
 meta def collect_meta_univ (e : expr) : list name :=
 native.rb_set.to_list $ e.fold native.mk_rb_set $ λ e' i s,
 match e' with
@@ -216,6 +292,10 @@ match e' with
 | (const _ ls) := ls.foldl (λ s' l, l.fold_mvar (flip native.rb_set.insert) s') s
 | _ := s
 end
+
+meta def instantiate_pi : expr → list expr → expr
+| (expr.pi n bi d b) (e::es) := instantiate_pi (b.instantiate_var e) es
+| e _ := e
 
 end expr
 
@@ -289,16 +369,17 @@ do e ← get_env,
 meta def better_induction (e : expr) : tactic $ list (name × list (expr × option expr) × list (name × expr)) :=
 do t ← infer_type e,
    let tn := t.get_app_fn.const_name,
+   env ← get_env,
    focus1 $
    do vs ← induction e,
       gs ← get_goals,
-      vs' ← mzip_with (λ g (pat : name × list expr × list (name × expr)),
-        do let ⟨n,args,σ⟩ := pat,
+      vs' ← list.mzip_with₃ (λ n g (pat : name × list expr × list (name × expr)),
+        do let ⟨_,args,σ⟩ := pat,
            set_goals [g],
            nrec ← rec_args_count tn n,
            let ⟨args,rec⟩ := args.split_at (args.length - nrec),
            args ← match_induct_hyp tn args rec,
-           pure ((n,args,σ))) gs vs,
+           pure ((n,args,σ))) (env.constructors_of tn) gs vs,
       set_goals gs,
       pure vs'
 
@@ -345,6 +426,117 @@ meta def unify_app (e : expr) (args : list expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    unify_app_aux e t args
 
+meta def mk_has_repr : tactic unit :=
+do `(has_repr %%t) ← target,
+   let n := t.get_app_fn.const_name,
+   d ← get_decl n,
+   let r : reducibility_hints := reducibility_hints.regular 1 tt,
+   env ← get_env,
+   ls ← local_context,
+   sig ← to_expr ``(%%t → string),
+   (_,df) ← solve_aux sig $ do
+     { match env.structure_fields n with
+       | (some fs) :=
+       do a ← intro1,
+          [(_,xs,_)] ← cases_core a,
+          let l := xs.length,
+          out ← list.mzip_with₄ (λ x (fn : name) (y : expr) z,
+            do let fn := (fn.update_prefix name.anonymous).to_string,
+               to_expr ``(%%(reflect x) ++ %%(reflect fn) ++ " := " ++ repr %%y ++ %%(reflect z)))
+            ("{ " :: list.repeat "  " (l-1)) fs xs (list.repeat ",\n" (l-1) ++ [" }"]),
+          out.mfoldr (λ e acc : expr, to_expr ``(%%e ++ %%acc)) (reflect "" : expr) >>= exact,
+          pure ()
+       | none :=
+       do g ← main_goal,
+          a ← intro1,
+          xs ← cases_core a,
+          out ← xs.mmap $ λ ⟨c,xs,_⟩,
+            do { out ← xs.mmap $ λ x, to_expr ``(" (" ++ repr %%x ++ ")"),
+                 let c := (c.update_prefix name.anonymous).to_string,
+                 out.mfoldl (λ acc e : expr, to_expr ``(%%acc ++ %%e)) (reflect c : expr) >>= exact },
+          pure () end },
+   df ← instantiate_mvars df >>= lambdas ls,
+   t ← infer_type df,
+   e ← add_decl' $ declaration.defn (n <.> "repr") d.univ_params t df r d.is_trusted,
+   refine ``( { repr := %%(e.mk_app ls) } ),
+   pure ()
+
+@[derive_handler]
+meta def has_repr_derive_handler : derive_handler :=
+instance_derive_handler ``has_repr mk_has_repr
+
+instance name.has_repr : has_repr name :=
+{ repr := λ x, "`" ++ x.to_string }
+
+private meta def report_invalid_simp_lemma {α : Type} (n : name): tactic α :=
+fail format!"invalid simplification lemma '{n}' (use command 'set_option trace.simp_lemmas true' for more details)"
+
+private meta def check_no_overload (p : pexpr) : tactic unit :=
+when p.is_choice_macro $
+  match p with
+  | macro _ ps :=
+    fail $ to_fmt "ambiguous overload, possible interpretations" ++
+           format.join (ps.map (λ p, (to_fmt p).indent 4))
+  | _ := failed
+  end
+
+private meta def add_simps : simp_lemmas → list name → tactic simp_lemmas
+| s []      := return s
+| s (n::ns) := do s' ← s.add_simp n, add_simps s' ns
+
+private meta def simp_lemmas.resolve_and_add (s : simp_lemmas) (u : list name) (n : name) (ref : pexpr) : tactic (simp_lemmas × list name) :=
+do
+  p ← resolve_name n,
+  check_no_overload p,
+  -- unpack local refs
+  let e := p.erase_annotations.get_app_fn.erase_annotations,
+  match e with
+  | const n _           :=
+    (do b ← is_valid_simp_lemma_cnst n, guard b, save_const_type_info n ref, s ← s.add_simp n, return (s, u))
+    <|>
+    (do eqns ← get_eqn_lemmas_for tt n, guard (eqns.length > 0), save_const_type_info n ref, s ← add_simps s eqns, return (s, u))
+    <|>
+    (do env ← get_env, guard (env.is_projection n).is_some, return (s, n::u))
+    <|>
+    report_invalid_simp_lemma n
+  | _ :=
+    (do e ← i_to_expr_no_subgoals p, b ← is_valid_simp_lemma e, guard b, try (save_type_info e ref), s ← s.add e, return (s, u))
+    <|>
+    report_invalid_simp_lemma n
+  end
+
+meta def simp_lemmas.add_pexpr (s : simp_lemmas) (u : list name) (p : pexpr) : tactic (simp_lemmas × list name) :=
+match p with
+| (const c [])          := simp_lemmas.resolve_and_add s u c p
+| (local_const c _ _ _) := simp_lemmas.resolve_and_add s u c p
+| _                     := do new_e ← i_to_expr_no_subgoals p, s ← s.add new_e, return (s, u)
+end
+
+meta def simp_lemmas.append_pexprs : simp_lemmas → list name → list pexpr → tactic (simp_lemmas × list name)
+| s u []      := return (s, u)
+| s u (l::ls) := do (s, u) ← simp_lemmas.add_pexpr s u l, simp_lemmas.append_pexprs s u ls
+
+
+meta def simp_only (ls : list pexpr) : tactic unit :=
+do let ls := ls.map (simp_arg_type.expr), -- >>= simp_lemmas.append_pexprs simp_lemmas.mk [],
+   -- interactive.dsimp tt ls [] (interactive.loc.ns [none])
+   interactive.simp none tt ls [] (interactive.loc.ns [none])
+
+open interactive.types interactive lean.parser
+
+@[user_command]
+meta def test_signature_cmd (_ : parse $ tk "#test") : lean.parser unit :=
+do e ← ident,
+show tactic unit, from
+do d ← get_decl e,
+   let e := @const tt d.to_name d.univ_levels,
+   t ← infer_type e >>= pp,
+   e.collect_meta_univ.enum.mmap' $ λ ⟨i,v⟩, unify_univ (level.mvar v) (level.param ("u_" ++ to_string i : string)),
+   e ← instantiate_mvars e,
+   e ← pp e,
+   trace format!"\nexample : {t} :=\n{e}\n",
+   pure ()
+
 end tactic
 
 namespace tactic.interactive
@@ -374,4 +566,59 @@ meta def whnf_type_hole : hole_command :=
        trace t,
        pure [] }
 
+meta def trace_error {α} (tac : tactic α) : tactic α
+| s :=
+match tac s with
+| r@(interaction_monad.result.success a a_1) := r
+| r@(interaction_monad.result.exception none a_1 a_2) := (trace "(no error message)" >> interaction_monad.result.exception none a_1) s
+| r@(interaction_monad.result.exception (some msg) a_1 a_2) := (trace (msg ()) >> interaction_monad.result.exception none a_1) s
+end
+
+
 end tactic.interactive
+
+instance subsingleton.fin0 {α} : subsingleton (fin 0 → α) :=
+subsingleton.intro $ λ a b, funext $ λ i, fin.elim0 i
+
+attribute [extensionality] function.hfunext
+
+meta def options.list_names (o : options) : list name := o.fold [] (::)
+
+meta def format.intercalate (fm : format) (xs : list format) : format :=
+format.join $ list.intersperse fm xs
+
+namespace expr
+
+meta def bracket (p : ℕ) (fmt : format) (p' : ℕ) : format :=
+if p' < p then format.paren fmt else fmt
+
+meta def fmt_binder (n : name) : binder_info → format → format
+| binder_info.default t := format!"({n} : {t})"
+| binder_info.implicit t := format!"{{{n} : {t}}"
+| binder_info.strict_implicit t := format!"⦃{n} : {t}⦄"
+| binder_info.inst_implicit t := format!"[{n} : {t}]"
+| binder_info.aux_decl t := "_"
+
+meta def parsable_printer' : expr → list name → ℕ → format
+| (expr.var a) l := λ _, format!"@{(l.nth a).get_or_else name.anonymous}"
+| (expr.sort level.zero) l := λ _, to_fmt "Prop"
+| (expr.sort (level.succ u)) l := λ _, format!"Type.{{{u}}"
+| (expr.sort u) l := λ _, format!"Sort.{{{u}}"
+| (expr.const a []) l := λ _, format!"@{a}"
+| (expr.const a ls) l := λ _, format!"@{a}.{{{format.intercalate  \" \" $ list.map to_fmt ls}}"
+| (expr.mvar a a_1 a_2) l := λ _, to_fmt a
+| (expr.local_const a a_1 a_2 a_3) l := λ _, to_fmt a_1
+| (expr.app a a_1) l := bracket 10 $ format!"{parsable_printer' a l 10} {parsable_printer' a_1 l 9}"
+| (expr.lam a a_1 a_2 a_3) l := bracket 8 $ format!"λ {fmt_binder a a_1 $ parsable_printer' a_2 l 10}, {parsable_printer' a_3 (a :: l) 10}"
+| (expr.pi a a_1 a_2 a_3) l :=
+       if a_3.has_var_idx 0
+          then bracket 8 $ format!"Π {fmt_binder a a_1 $ parsable_printer' a_2 l 10}, {parsable_printer' a_3 (a :: l) 10}"
+          else bracket 8 $ format!"{parsable_printer' a_2 l 7} → {parsable_printer' a_3 (a :: l) 7}"
+| (expr.elet a a_1 a_2 a_3) l := bracket 8 $ format!"let {a} : {parsable_printer' a_1 l 10} := {parsable_printer' a_2 l 10} in {parsable_printer' a_3 (a :: l) 10}"
+| (expr.macro a a_1) l := λ _, to_fmt "unsupported"
+
+meta def parsable_printer (e : expr) : format := parsable_printer' e [] 10
+
+meta def as_binder (e : expr) := fmt_binder e.local_pp_name e.binding_info (parsable_printer e.local_type)
+
+end expr

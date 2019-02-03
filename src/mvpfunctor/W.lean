@@ -6,7 +6,7 @@ Author: Jeremy Avigad
 The W construction as a multivariate polynomial functor.
 -/
 import mvpfunctor.basic
-universe u
+universes u v
 
 namespace mvpfunctor
 open typevec
@@ -236,7 +236,7 @@ the qpf axioms are expressed in terms of `map` on `P`.
 def W_mk' {α : typevec n} : P.apply (α.append1 (P.W α)) → P.W α
 | ⟨a, f⟩ := P.W_mk a (P.contents_dest_left f) (P.contents_dest_right f)
 
-def W_dest' {α : typevec n} : P.W α → P.apply (α.append1 (P.W α)) :=
+def W_dest' {α : typevec.{u} n} : P.W α → P.apply (α.append1 (P.W α)) :=
 P.W_rec (λ a f' f _, ⟨a, P.append_contents f' f⟩)
 
 theorem W_dest'_W_mk {α : typevec n}
