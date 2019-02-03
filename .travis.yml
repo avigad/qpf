@@ -18,6 +18,8 @@ install:
   - export PATH="$HOME/scripts:$PATH"
   - cp travis_long.sh $HOME/scripts/travis_long
   - chmod +x $HOME/scripts/travis_long
+  - curl https://raw.githubusercontent.com/leanprover-community/mathlib/master/scripts/remote-install-update-mathlib.sh -sSf | sh
+  - update-mathlib
   - (git status | grep  -e "Changes not staged for commit:"); RESULT=$?
   - if [ $RESULT -eq 0 ]; then git checkout -f HEAD ; fi
   - git clean -d -f -q
@@ -26,16 +28,6 @@ install:
 
 jobs:
   include:
-    - stage: Pre-build
-      script:
-        - travis_long "timeout 2400 leanpkg test" | awk 'BEGIN{e=0;c=-1}c&&--c;/error/{if (!e) {c=30;e=1}};{if (!c) {exit 1}}'
-
-    - stage: Pre-build-2
-      script:
-        - travis_long "timeout 2400 leanpkg test" | awk 'BEGIN{e=0;c=-1}c&&--c;/error/{if (!e) {c=30;e=1}};{if (!c) {exit 1}}'
-
     - stage: Test
       script:
         - leanpkg test
-        - lean --recursive --export=mathlib.txt src/
-        - leanchecker mathlib.txt
