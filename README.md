@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/avigad/qpf.svg?branch=master)](https://travis-ci.org/avigad/qpf)
+
 # Datatypes as Quotients of Polynomial Functors
 
 This repository contains work in progress by Jeremy Avigad, Mario Carneiro, and Simon Hudon.
