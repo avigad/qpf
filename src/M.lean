@@ -625,7 +625,7 @@ lemma M_dest_corec (g : α → P.apply α) (x : α) :
   M_dest (M_corec g x) = M_corec g <$> g x :=
 by rw [M_corec,M_dest,corec_def,from_cofix_mk]
 
-lemma M_bisim {α : Type*} (R : M P → M P → Prop)
+lemma M_bisim (R : M P → M P → Prop)
     (h : ∀ x y, R x y → ∃ a f f',
       M_dest x = ⟨a, f⟩ ∧
       M_dest y = ⟨a, f'⟩ ∧
@@ -650,7 +650,7 @@ theorem M_bisim' {α : Type*} (Q : α → Prop) (u v : α → M P)
   ∀ x, Q x → u x = v x :=
 λ x Qx,
 let R := λ w z : M P, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
-@M_bisim P (M P) R
+@M_bisim P R
   (λ x y ⟨x', Qx', xeq, yeq⟩,
     let ⟨a, f, f', ux'eq, vx'eq, h'⟩ := h x' Qx' in
       ⟨a, f, f', xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, h'⟩)

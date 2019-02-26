@@ -178,6 +178,7 @@ def to_list {α} (x : t α) : list α :=
 
 end traversable
 
+/-
 namespace name
 
 def append_suffix : name → string → name
@@ -185,6 +186,7 @@ def append_suffix : name → string → name
 | n _ := n
 
 end name
+-/
 
 namespace level
 

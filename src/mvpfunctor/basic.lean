@@ -41,19 +41,17 @@ theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) :
   ∀ x : P.apply α, (g ⊚ f) <$$> x = g <$$> (f <$$> x)
 | ⟨a, h⟩ := rfl
 
-
-
-def comp (P : mvpfunctor.{u} n) (Q : fin n → mvpfunctor.{u} m) : mvpfunctor m :=
+def comp (P : mvpfunctor.{u} n) (Q : fin' n → mvpfunctor.{u} m) : mvpfunctor m :=
 { A := Σ a₂ : P.1, Π i, P.2 a₂ i → (Q i).1,
   B := λ a, λ i, Σ j (b : P.2 a.1 j), (Q j).2 (a.snd j b) i }
 
-variables {P} {Q : fin n → mvpfunctor.{u} m} {α β : typevec.{u} m}
+variables {P} {Q : fin' n → mvpfunctor.{u} m} {α β : typevec.{u} m}
 
 def comp.mk (x : P.apply (λ i, (Q i).apply α)) : (comp P Q).apply α :=
 ⟨ ⟨ x.1, λ i a, (x.2 _ a).1  ⟩, λ i a, (x.snd a.fst (a.snd).fst).snd i (a.snd).snd ⟩
 
 def comp.get (x : (comp P Q).apply α) : P.apply (λ i, (Q i).apply α) :=
-⟨ x.1.1, λ i a, ⟨x.fst.snd i a, λ (j : fin m) (b : (Q i).B _ j), x.snd j ⟨i, ⟨a, b⟩⟩⟩ ⟩
+⟨ x.1.1, λ i a, ⟨x.fst.snd i a, λ (j : fin' m) (b : (Q i).B _ j), x.snd j ⟨i, ⟨a, b⟩⟩⟩ ⟩
 
 lemma comp.get_map (f : α ⟹ β) (x : (comp P Q).apply α) :
   comp.get (f <$$> x) = (λ i (x : (Q i).apply α), f <$$> x) <$$> comp.get x :=

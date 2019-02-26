@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2018 Jeremy Avigad. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Author: Jeremy Avigad
+Author: Jeremy Avigad, Mario Carneiro
 
 Tuples of types, and their categorical structure.
 
@@ -33,13 +33,17 @@ n-tuples of types, as a category
 
 universes u v w
 
-def typevec (n : ℕ) := fin n → Type*
+inductive fin' : ℕ → Type
+| raise {n : ℕ} : fin' n → fin' n.succ
+| last {n : ℕ} : fin' n.succ
+
+def typevec (n : ℕ) := fin' n → Type*
 
 namespace typevec
 
 variable {n : ℕ}
 
-def arrow (α β : typevec n) := Π i : fin n, α i → β i
+def arrow (α β : typevec n) := Π i : fin' n, α i → β i
 
 infixl ` ⟹ `:40 := arrow
 
@@ -88,154 +92,89 @@ lemma mv_map_map (g : α ⟹ β) (h : β ⟹ γ) (x : F α) :
 eq.symm $ mv_comp_map _ _ _
 
 end
-/-
-Support for extending a typevec by one element.
--/
-
-namespace eq
-
-theorem mp_mpr {α β : Type*} (h : α = β) (x : β) :
-  eq.mp h (eq.mpr h x) = x :=
-by induction h; reflexivity
-
-theorem mpr_mp {α β : Type*} (h : α = β) (x : α) :
-  eq.mpr h (eq.mp h x) = x :=
-by induction h; reflexivity
-
-end eq
-
-namespace fin
-
-def succ_cases {n : ℕ} (i : fin (n + 1)) : psum {j : fin n // i = j.cast_succ} (i = fin.last n) :=
-begin
-  cases i with i h,
-  by_cases h' : i < n,
-  { left, refine ⟨⟨i, h'⟩, _⟩, apply eq_of_veq, reflexivity },
-  right, apply eq_of_veq,
-  show i = n, from le_antisymm (nat.le_of_lt_succ h) (le_of_not_lt h')
-end
-
-def succ_rec' {n : ℕ} {β : fin (n + 1) → Type*}
-  (f : Π i : fin n, β i.cast_succ) (a : β (fin.last n)) : Π i : fin (n + 1), β i
-| ⟨i, h⟩ := if h' : i < n then
-              have cast_succ ⟨i, h'⟩ = ⟨i, h⟩, from fin.eq_of_veq rfl,
-              by rw ←this; exact f ⟨i, h'⟩
-            else
-              have fin.last n = ⟨i, h⟩,
-                from fin.eq_of_veq (le_antisymm (le_of_not_lt h') (nat.le_of_lt_succ h)),
-              by rw ←this; exact a
-
-@[simp] theorem succ_rec'_cast_succ {n : ℕ} {β : fin (n + 1) → Type*}
-    (f : Π i : fin n, β i.cast_succ) (a : β (fin.last n)) (i : fin n) :
-  succ_rec' f a i.cast_succ = f i :=
-begin
-  cases i with i h,
-  change succ_rec' f a ⟨i, _⟩ = _,
-  dsimp [succ_rec'], rw dif_pos h,
-  reflexivity
-end
-
-@[simp] theorem succ_rec'_last {n : ℕ} {β : fin (n + 1) → Type*}
-    (f : Π i : fin n, β i.cast_succ) (a : β (fin.last n)) :
-  succ_rec' f a (fin.last n) = a :=
-begin
-  change succ_rec' f a ⟨n, _⟩ = _,
-  dsimp [succ_rec'], rw dif_neg (lt_irrefl n),
-  reflexivity
-end
-
-end fin
 
 namespace typevec
 
 variable {n : ℕ}
 
-def append1 (α : typevec n) (β : Type*) : typevec (n+1) :=
-fin.succ_rec' α β
+def append1 (α : typevec n) (β : Type*) : typevec (n+1)
+| (fin'.raise i) := α i
+| fin'.last      := β
 
-def drop (α : typevec (n+1)) : typevec n := λ i, α i.cast_succ
+def drop (α : typevec (n+1)) : typevec n := λ i, α i.raise
 
-def last (α : typevec (n+1)) : Type* := α (fin.last n)
+def last (α : typevec (n+1)) : Type* := α fin'.last
 
-theorem drop_append1 {α : typevec n} {β : Type*} {i : fin n} : drop (append1 α β) i = α i :=
-fin.succ_rec'_cast_succ _ _ _
+theorem drop_append1 {α : typevec n} {β : Type*} {i : fin' n} : drop (append1 α β) i = α i := rfl
 
-theorem last_append1 {α : typevec n} {β : Type*} : last (append1 α β) = β :=
-fin.succ_rec'_last _ _
+theorem last_append1 {α : typevec n} {β : Type*} : last (append1 α β) = β := rfl
 
-def to_drop_append {α : typevec n} {β : Type*} : α ⟹ drop (append1 α β) :=
-λ i, eq.mpr drop_append1
+theorem append1_drop_last (α : typevec (n+1)) : append1 (drop α) (last α) = α :=
+funext $ λ i, by cases i; refl
 
-def from_drop_append {α : typevec n} {β : Type*} : drop (append1 α β) ⟹ α :=
-λ i, eq.mp drop_append1
+@[elab_as_eliminator] def append1_cases
+  {C : typevec (n+1) → Sort u} (H : ∀ α β, C (append1 α β)) (γ) : C γ :=
+by rw [← @append1_drop_last _ γ]; apply H
 
-@[simp] theorem to_drop_append_from_drop_append {α : typevec n} {β : Type*} {i : fin n}
-  (x : drop (append1 α β) i) :
-to_drop_append i (from_drop_append i x) = x := eq.mpr_mp _ _
+@[simp] theorem append1_cases_append1 {C : typevec (n+1) → Sort u}
+  (H : ∀ α β, C (append1 α β)) (α β) :
+  @append1_cases _ C H (append1 α β) = H α β := rfl
 
-@[simp] theorem from_drop_append_to_drop_append {α : typevec n} {β : Type*} {i : fin n} (x : α i) :
-from_drop_append i (@to_drop_append n α β i x) = x := eq.mp_mpr _ _
-
-def to_last_append {α : typevec n} {β : Type*} : β → last (append1 α β) :=
-eq.mpr last_append1
-
-def from_last_append {α : typevec n} {β : Type*} : last (append1 α β) → β :=
-eq.mp last_append1
-
-@[simp] theorem to_last_append_from_last_append {α : typevec n} {β : Type*} (x : last (append1 α β)) :
-to_last_append (from_last_append x) = x := eq.mpr_mp _ _
-
-@[simp] theorem from_last_append_to_last_append {α : typevec n} {β : Type*} (x : β) :
-from_last_append (@to_last_append n α β x) = x := eq.mpr_mp _ _
-
-theorem append1_drop_last {α : typevec (n+1)} {i : fin (n+1)} : append1 (drop α) (last α) i = α i :=
-by rw [append1, drop, last]; rcases i.succ_cases with ⟨j, ieq⟩ | ieq; rw ieq; simp
-
-def to_append1_drop_last {α : typevec (n+1)} : α ⟹ append1 (drop α) (last α) :=
-λ i, eq.mpr append1_drop_last
-
-def from_append1_drop_last {α : typevec (n+1)} : append1 (drop α) (last α) ⟹ α :=
-λ i, eq.mp append1_drop_last
-
-@[simp] theorem to_append1_drop_last_from_append1_drop_last {α : typevec (n+1)} {i : fin (n+1)}
-    (x : append1 (drop α) (last α) i) :
-  to_append1_drop_last i (from_append1_drop_last i x) = x := eq.mp_mpr _ _
-
-@[simp] theorem from_append1_drop_last_to_append1_drop_last {α : typevec (n+1)} {i : fin (n+1)}
-    (x : α i) :
-  from_append1_drop_last i (to_append1_drop_last i x) = x := eq.mpr_mp _ _
+def split_fun {α α' : typevec (n+1)}
+  (f : drop α ⟹ drop α') (g : last α → last α') : α ⟹ α'
+| (fin'.raise i) := f i
+| fin'.last      := g
 
 def append_fun {α α' : typevec n} {β β' : Type*}
-  (f : α ⟹ α') (g : β → β') : append1 α β ⟹ append1 α' β' :=
-fin.succ_rec' (to_drop_append ⊚ f ⊚ from_drop_append) (to_last_append ∘ g ∘ from_last_append)
+  (f : α ⟹ α') (g : β → β') : append1 α β ⟹ append1 α' β' := split_fun f g
 
 def drop_fun {α β : typevec (n+1)} (f : α ⟹ β) : drop α ⟹ drop β :=
-λ i, f i.cast_succ
+λ i, f i.raise
 
 def last_fun {α β : typevec (n+1)} (f : α ⟹ β) : last α → last β :=
-f (fin.last n)
+f fin'.last
 
-theorem eq_of_drop_last_eq {α β : typevec (n+1)} (f g : α ⟹ β)
+theorem eq_of_drop_last_eq {α β : typevec (n+1)} {f g : α ⟹ β}
   (h₀ : ∀ j, drop_fun f j = drop_fun g j) (h₁ : last_fun f = last_fun g) : f = g :=
-begin
-  ext1 i; rcases i.succ_cases with ⟨j, ieq⟩ | ieq; rw ieq,
-  { exact h₀ j },
-  exact h₁
-end
+by ext1 i; rcases i with ⟨j, ieq⟩ | ieq; [apply h₀, apply h₁]
 
-theorem drop_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
-  drop_fun (append_fun f g) = to_drop_append ⊚ f ⊚ from_drop_append :=
-by ext1 i; dsimp only [drop_fun, append_fun]; rw [fin.succ_rec'_cast_succ]
+@[simp] theorem drop_fun_split_fun {α α' : typevec (n+1)}
+  (f : drop α ⟹ drop α') (g : last α → last α') :
+  drop_fun (split_fun f g) = f := rfl
 
-theorem last_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
-  last_fun (append_fun f g) = to_last_append ∘ g ∘ from_last_append :=
-by ext1 i; dsimp only [last_fun, append_fun]; rw [fin.succ_rec'_last]
+@[simp] theorem last_fun_split_fun {α α' : typevec (n+1)}
+  (f : drop α ⟹ drop α') (g : last α → last α') :
+  last_fun (split_fun f g) = g := rfl
 
-def append_fun_comp {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Type*}
+@[simp] theorem drop_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
+  drop_fun (append_fun f g) = f := rfl
+
+@[simp] theorem last_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
+  last_fun (append_fun f g) = g := rfl
+
+theorem split_drop_fun_last_fun {α α' : typevec (n+1)} (f : α ⟹ α') :
+  split_fun (drop_fun f) (last_fun f) = f :=
+eq_of_drop_last_eq (λ _, rfl) rfl
+
+theorem split_fun_inj
+  {α α' : typevec (n+1)} {f f' : drop α ⟹ drop α'} {g g' : last α → last α'}
+  (H : split_fun f g = split_fun f' g') : f = f' ∧ g = g' :=
+by rw [← drop_fun_split_fun f g, H, ← last_fun_split_fun f g, H]; simp
+
+theorem append_fun_inj {α α' : typevec n} {β β' : Type*} {f f' : α ⟹ α'} {g g' : β → β'} :
+  append_fun f g = append_fun f' g' →  f = f' ∧ g = g' :=
+split_fun_inj
+
+theorem split_fun_comp {α₀ α₁ α₂ : typevec (n+1)}
+    (f₀ : drop α₀ ⟹ drop α₁) (f₁ : drop α₁ ⟹ drop α₂)
+    (g₀ : last α₀ → last α₁) (g₁ : last α₁ → last α₂) :
+  split_fun (f₁ ⊚ f₀) (g₁ ∘ g₀) = split_fun f₁ g₁ ⊚ split_fun f₀ g₀ :=
+eq_of_drop_last_eq (λ _, rfl) rfl
+
+theorem append_fun_comp {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Type*}
     (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
   append_fun (f₁ ⊚ f₀) (g₁ ∘ g₀) = append_fun f₁ g₁ ⊚ append_fun f₀ g₀ :=
-by ext1 i; rcases i.succ_cases with ⟨j, ieq⟩ | ieq; rw ieq;
-    simp [append_fun, function.comp, typevec.comp]
+eq_of_drop_last_eq (λ _, rfl) rfl
 
 theorem drop_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) :
   drop_fun (f₁ ⊚ f₀) = drop_fun f₁ ⊚ drop_fun f₀ := rfl
@@ -243,23 +182,12 @@ theorem drop_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α�
 theorem last_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) :
   last_fun (f₁ ⊚ f₀) = last_fun f₁ ∘ last_fun f₀ := rfl
 
-theorem drop_fun_to_append1_drop_last {α : typevec (n+1)} :
-  drop_fun (@to_append1_drop_last n α) = to_drop_append := rfl
-
-theorem last_fun_to_append1_drop_last {α : typevec (n+1)} :
-  last_fun (@to_append1_drop_last n α) = to_last_append := rfl
-
-theorem append_fun_aux {γ : typevec (n+1)} {α : typevec n} {β : Type*} (f : γ ⟹ append1 α β) :
-  append_fun (from_drop_append ⊚ drop_fun f)
-      (from_last_append ∘ last_fun f) ⊚ to_append1_drop_last = f :=
-begin
-  ext1 i, rcases i.succ_cases with ⟨j, ieq⟩ | ieq; rw ieq;
-    simp [append_fun, function.comp, typevec.comp]; ext x; congr; apply eq.mp_mpr
-end
+theorem append_fun_aux {α α' : typevec n} {β β' : Type*}
+  (f : append1 α β ⟹ append1 α' β') : append_fun (drop_fun f) (last_fun f) = f :=
+eq_of_drop_last_eq (λ _, rfl) rfl
 
 theorem append_fun_id_id {α : typevec n} {β : Type*} :
   append_fun (@id n α) (@_root_.id β) = id :=
-by ext1 i; rcases i.succ_cases with ⟨j, ieq⟩ | ieq; rw ieq; ext x;
-     simp [append_fun, typevec.comp, id]
+eq_of_drop_last_eq (λ _, rfl) rfl
 
 end typevec

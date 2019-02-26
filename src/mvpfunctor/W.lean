@@ -22,49 +22,39 @@ def last : pfunctor :=
 def append_contents {α : typevec n} {β : Type*}
     {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
   P.B a ⟹ α.append1 β :=
-append_fun f' f ⊚ to_append1_drop_last
+split_fun f' f
 
 def contents_dest_left {α : typevec n} {β : Type*} {a : P.A} (f'f : P.B a ⟹ α.append1 β) :
   P.drop.B a ⟹ α :=
-from_drop_append ⊚ drop_fun f'f
+drop_fun f'f
 
 def contents_dest_right {α : typevec n} {β : Type*} {a : P.A} (f'f : P.B a ⟹ α.append1 β) :
   P.last.B a → β :=
-from_last_append ∘ last_fun f'f
+last_fun f'f
 
 theorem contents_dest_left_append_contents {α : typevec n} {β : Type*}
     {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.contents_dest_left (P.append_contents f' f) = f' :=
-begin
-  rw [contents_dest_left, append_contents, drop_fun_comp, drop_fun_append_fun],
-  rw [drop_fun_to_append1_drop_last],
-  simp only [typevec.comp, from_drop_append_to_drop_append]
-end
+  P.contents_dest_left (P.append_contents f' f) = f' := rfl
 
 theorem contents_dest_right_append_contents {α : typevec n} {β : Type*}
     {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.contents_dest_right (P.append_contents f' f) = f :=
-begin
-  rw [contents_dest_right, append_contents, last_fun_comp, last_fun_append_fun],
-  rw [last_fun_to_append1_drop_last],
-  simp only [function.comp, from_last_append_to_last_append]
-end
+  P.contents_dest_right (P.append_contents f' f) = f := rfl
 
 theorem append_contents_eta {α : typevec n} {β : Type*} {a : P.A}
     (f : P.B a ⟹ α.append1 β) :
   append_contents P (contents_dest_left P f) (contents_dest_right P f) = f :=
-by rw [append_contents, contents_dest_left, contents_dest_right, append_fun_aux]
+split_drop_fun_last_fun _
 
 theorem append_fun_comp_append_contents {α γ : typevec n} {β δ : Type*} {a : P.A}
     (g' : α ⟹ γ) (g : β → δ) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
   append_fun g' g ⊚ P.append_contents f' f = P.append_contents (g' ⊚ f') (g ∘ f) :=
-by rw [append_contents, append_contents, append_fun_comp, comp_assoc]
+(split_fun_comp _ _ _ _).symm
 
 /- defines a typevec of labels to assign to each node of P.last.W -/
-inductive W_path : P.last.W → fin n → Type u
-| root (a : P.A) (f : P.last.B a → P.last.W) (i : fin n) (c : P.drop.B a i) :
+inductive W_path : P.last.W → fin' n → Type u
+| root (a : P.A) (f : P.last.B a → P.last.W) (i : fin' n) (c : P.drop.B a i) :
     W_path ⟨a, f⟩ i
-| child (a : P.A) (f : P.last.B a → P.last.W) (i : fin n) (j : P.last.B a) (c : W_path (f j) i) :
+| child (a : P.A) (f : P.last.B a → P.last.W) (i : fin' n) (j : P.last.B a) (c : W_path (f j) i) :
     W_path ⟨a, f⟩ i
 
 def W_path_cases_on {α : typevec n} {a : P.A} {f : P.last.B a → P.last.W}
@@ -231,8 +221,9 @@ theorem map_apply_append1 {α γ : typevec n} (g : α ⟹ γ)
 append_fun g (P.W_map g) <$$> P.apply_append1 a f' f =
   P.apply_append1 a (g ⊚ f') (λ x, P.W_map g (f x)) :=
 begin
-  rw [apply_append1, apply_append1, append_contents, append_contents, map_eq, append_fun_comp],
-  reflexivity
+  rw [apply_append1, apply_append1, append_contents, append_contents,
+    map_eq, append_fun, ← split_fun_comp],
+  refl
 end
 
 /-

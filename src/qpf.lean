@@ -76,7 +76,8 @@ theorem comp_map {α β γ : Type*} (f : α → β) (g : β → γ) (x : F α) :
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map, ←abs_map, ←abs_map], reflexivity }
 
 theorem is_lawful_functor
-  (h : ∀ α β : Type u, @functor.map_const F _ α _ = functor.map ∘ function.const β) : is_lawful_functor F :=
+    (h : ∀ α β : Type u, @functor.map_const F _ α _ = functor.map ∘ function.const β) :
+  is_lawful_functor F :=
 { map_const_eq := h,
   id_map := @id_map F _ _,
   comp_map := @comp_map F _ _ }
@@ -339,13 +340,6 @@ begin
     rw h _ _ r'xy },
   right, exact rxy
 end
-
-/-
-TODO:
-- define other two versions of relation lifting (via subtypes, via P)
-- derive other bisimulation principles.
-- define mk and prove identities.
--/
 
 end qpf
 
