@@ -209,7 +209,8 @@ begin
   rw [h, comp_W_path_cases_on]
 end
 
--- TODO: this technical theorem is used in one place below. Can it be avoided?
+-- TODO: this technical theorem is used in one place in constructing the initial algebra.
+-- Can it be avoided?
 
 @[reducible] def apply_append1 {α : typevec n} {β : Type*}
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :

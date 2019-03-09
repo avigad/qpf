@@ -176,6 +176,11 @@ theorem append_fun_comp {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Typ
   append_fun (f₁ ⊚ f₀) (g₁ ∘ g₀) = append_fun f₁ g₁ ⊚ append_fun f₀ g₀ :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
+theorem append_fun_comp_id {α : typevec n} {β₀ β₁ β₂ : Type*}
+    (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
+  append_fun (@id _ α) (g₁ ∘ g₀) = append_fun id g₁ ⊚ append_fun id g₀ :=
+eq_of_drop_last_eq (λ _, rfl) rfl
+
 theorem drop_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) :
   drop_fun (f₁ ⊚ f₀) = drop_fun f₁ ⊚ drop_fun f₀ := rfl
 

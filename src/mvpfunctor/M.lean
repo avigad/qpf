@@ -34,11 +34,6 @@ def M_corec_shape {β : Type u}
   β → P.last.M :=
 pfunctor.M_corec (λ b, ⟨g₀ b, g₂ b⟩)
 
-/-
-I factored out these casts for fear that we might have to prove something about them,
-but if not,
--/
-
 def cast_dropB {a a' : P.A} (h : a = a') : P.drop.B a ⟹ P.drop.B a' :=
 λ i b, eq.rec_on h b
 
@@ -122,7 +117,7 @@ begin
   transitivity, apply M_dest_corec',
   cases g x with a f, dsimp,
   rw mvpfunctor.map_eq, congr,
-  conv { to_rhs, rw [←P.append_contents_eta f, append_fun_comp_append_contents]},
+  conv { to_rhs, rw [←P.append_contents_eta f, append_fun_comp_append_contents] },
   refl
 end
 
@@ -141,7 +136,7 @@ begin
   cases e₁, exact ⟨_, e₁', split_fun_inj ef⟩,
 end
 
-lemma M_bisim {α : typevec n} (R : P.M α → P.M α → Prop)
+theorem M_bisim {α : typevec n} (R : P.M α → P.M α → Prop)
   (h : ∀ x y, R x y → ∃ a f f₁ f₂,
     P.M_dest x = ⟨a, split_fun f f₁⟩ ∧
     P.M_dest y = ⟨a, split_fun f f₂⟩ ∧
@@ -171,6 +166,15 @@ begin
     cases h'.symm.trans e₂' },
   { exact (congr_fun (congr_fun e₃ i) c : _) },
   { exact IH _ _ (h'' _) }
+end
+
+theorem M_dest_map {α β : typevec n} (g : α ⟹ β) (x : P.M α) :
+  P.M_dest (g <$$> x) = append_fun g (λ x, g <$$> x) <$$> P.M_dest x :=
+begin
+  cases x with a f,
+  rw map_eq,
+  conv { to_rhs, rw [M_dest, M_dest', map_eq, append_fun_comp_append_contents] },
+  reflexivity
 end
 
 end mvpfunctor
