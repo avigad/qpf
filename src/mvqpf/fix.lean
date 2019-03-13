@@ -136,7 +136,7 @@ def fix.map {α β : typevec n} (g : α ⟹ β) : fix F α → fix F β :=
 quotient.lift (λ x : q.P.W α, ⟦q.P.W_map g x⟧)
   (λ a b h, quot.sound (Wequiv_map _ _ _ h))
 
-instance mvfunctor_fix : mvfunctor (fix F) :=
+instance fix.mvfunctor : mvfunctor (fix F) :=
 { map := @fix.map _ _ _ _}
 
 variable {α : typevec.{u} n}

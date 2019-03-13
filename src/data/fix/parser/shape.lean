@@ -1,6 +1,7 @@
 
 import data.fix.parser.basic
 import mvqpf.fix
+import mvqpf.cofix
 
 namespace tactic
 
@@ -37,7 +38,7 @@ do d ← inductive_type.of_decl d,
    mk_internal_functor_eqn func,
    pure (func, func')
 
-meta def mk_fixpoint (func : internal_mvfunctor) (d : internal_mvfunctor) : tactic unit :=
+meta def mk_fixpoint (fix : name) (func d : internal_mvfunctor) : tactic unit :=
 do  let dead := func.dead_params.map prod.fst,
    -- let n := dead.length,
    let shape := (@const tt (func.decl.to_name <.> "internal") func.induct.u_params).mk_app dead,
@@ -46,7 +47,7 @@ do  let dead := func.dead_params.map prod.fst,
    -- trace "shape", trace n,
    -- df ← to_expr ``(mvqpf.fix %%shape),
    -- trace "shape",
-   df ← (mk_mapp ``mvqpf.fix [none,shape,none,none] >>= lambdas dead : tactic _),
+   df ← (mk_mapp fix [none,shape,none,none] >>= lambdas dead : tactic _),
    -- trace "shape",
    t ← infer_type df,
    let intl_n := func.decl.to_name.get_prefix <.> "internal",
@@ -56,18 +57,25 @@ do  let dead := func.dead_params.map prod.fst,
    t  ← infer_type df,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df
 
-@[user_command]
-meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
-do d ← inductive_decl.parse meta_info,
-   (func, d) ← mk_shape_functor' d,
+meta def mk_datatype (iter : name) (d : inductive_decl) : parser unit :=
+do (func, d) ← mk_shape_functor' d,
    mk_mvfunctor_instance func,
    mk_pfunctor func,
    mk_pfunc_constr func,
    mk_pfunc_recursor func,
-   -- mk_pfunc_map func,
-   -- mk_pfunc_mvfunctor_instance func,
    mk_mvqpf_instance func,
-   mk_fixpoint func d,
+   mk_fixpoint iter func d
+
+@[user_command]
+meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
+do d ← inductive_decl.parse meta_info,
+   mk_datatype ``mvqpf.fix d,
+   pure ()
+
+@[user_command]
+meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
+do d ← inductive_decl.parse meta_info,
+   mk_datatype ``mvqpf.cofix d,
    pure ()
 
 end tactic
@@ -75,6 +83,10 @@ end tactic
 data nat'
 | zero : nat'
 | succ : nat' → nat'
+
+codata nat''
+| zero : nat''
+| succ : nat'' → nat''
 
 #print nat'.internal
 #print nat'
@@ -89,6 +101,13 @@ data list (α : Type u) : Type u
 
 #print hidden.list.internal
 #print hidden.list
+
+codata stream (α : Type u) : Type u
+| zero : stream
+| succ : α → stream → stream
+
+#print hidden.stream.internal
+#print hidden.stream
 
 end hidden
 

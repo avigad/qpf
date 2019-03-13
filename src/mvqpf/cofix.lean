@@ -51,7 +51,7 @@ quot.lift (λ x : q.P.M α, quot.mk Mcongr (g <$$> x))
     show r' (g <$$> a₁) (g <$$> a₂), from ⟨a₁, a₂, ra₁a₂, rfl, rfl⟩
   end
 
-instance mvfunctor_cofix : mvfunctor (cofix F) :=
+instance cofix.mvfunctor : mvfunctor (cofix F) :=
 { map := @cofix.map _ _ _ _}
 
 def cofix.corec {α : typevec n} {β : Type u} (g : β → F (α.append1 β)) : β → cofix F α :=
