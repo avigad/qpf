@@ -180,8 +180,8 @@ do let decl := declaration.cnst ind.name ind.u_names ind.type tt,
 --           params := params,
 --           type := t }
 
-notation `⦃ ` r:( foldr `, ` (h t, typevec.append1 t h) fin.elim0 ) ` ⦄` := r
-notation `⦃`  `⦄` := fin.elim0
+notation `⦃ ` r:( foldr `, ` (h t, typevec.append1 t h) fin'.elim0 ) ` ⦄` := r
+notation `⦃`  `⦄` := fin'.elim0
 
 local prefix `♯`:0 := cast (by try { simp only with typevec }; congr' 1; try { simp only with typevec })
 
@@ -212,7 +212,7 @@ do let trusted := func.decl.is_trusted,
    add_decl $ declaration.defn func.def_name func.decl.univ_params t df (reducibility_hints.regular 1 tt) trusted
 
 meta def mk_live_vec (u : level) (vs : list expr) : tactic expr :=
-do nil ← mk_mapp ``fin.elim0 [@expr.sort tt $ level.succ u],
+do nil ← mk_mapp ``fin'.elim0 [@expr.sort tt $ level.succ u],
    vs.mfoldr (λ e s, mk_mapp ``typevec.append1 [none,s,e]) nil
 
 meta def mk_map_vec (u : level) (vs : list expr) : tactic expr :=
@@ -422,7 +422,7 @@ do let n := decl.name,
           let u := u'.pred,
           let vec_t := @const tt ``typevec [u] (reflect arity),
           t ← pis (func.dead_params.map prod.fst ++ [hd_v]) vec_t,
-          nil ← mk_mapp ``fin.elim0 [some $ expr.sort u.succ],
+          nil ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
           trace "bar",
           vec ← func.live_params.mfoldr (λ e v,
             do c ← mk_const $ child_n ++ e.1.local_pp_name,
@@ -785,34 +785,14 @@ qpf list_F'' (α β γ : Type u)
 -- #check list_F''.internal_eq
 -- #check @list_F''.map
 
-example : ∀ (α : Type*) (β : Type*) (γ : Type*),
-    list_F''.internal α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil)) = list_F'' α β γ :=
-list_F''.internal_eq
 
-example : Π (α : Type*) (β : Type*) (α_1 β_1 : typevec 1),
-    α_1 ⟹ β_1 → list_F''.internal α β α_1 → list_F''.internal α β β_1 :=
-@list_F''.internal.map
 
 -- #test hidden.list_F''.internal.map._equation_0
 -- #test hidden.list_F''.internal.map._equation_1
 
 -- #check list_F''.internal.map
 
-example : ∀ (α : Type u_1) (β : Type u_1) (γ γ' : Type u_1) (f2 : γ → γ') (a : β → γ),
-  list_F''.internal.map α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil))
-      (typevec.of_ind (typevec.ind.cons γ' typevec.ind.nil))
-      (typevec.append_fun typevec.nil_fun f2)
-      _ =
-    list_F''.nil α (λ (a_1 : β), f2 (a a_1)) :=
-list_F''.internal.map._equation_0
 
-example : ∀ (α : Type u_1) (β : Type u_1) (γ γ' : Type u_1) (f2 : γ → γ') (a : α → β),
-  list_F''.internal.map α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil))
-      (typevec.of_ind (typevec.ind.cons γ' typevec.ind.nil))
-      (typevec.append_fun typevec.nil_fun f2)
-      _ =
-    list_F''.cons γ' (λ (a_1 : α), a a_1) :=
-list_F''.internal.map._equation_1
 
 -- @[derive mvqpf]
 qpf list_F''' (α β γ : Type u)
@@ -870,9 +850,6 @@ qpf list_F'''' (α β γ : Type u)
 -- #check @list_F''''.internal_eq
 -- #check @list_F''''.internal.map
 
-example : ∀ (α : Type*) (β : Type*) (γ : Type*),
-    list_F''''.internal α β γ (typevec.of_ind typevec.ind.nil) = list_F'''' α β γ :=
-@list_F''''.internal_eq
 
 example : Π (α : Type*) (β : Type*) (γ : Type*) (α_1 β_1 : typevec 0),
     α_1 ⟹ β_1 → list_F''''.internal α β γ α_1 → list_F''''.internal α β γ β_1 :=
