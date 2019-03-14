@@ -584,9 +584,6 @@ attribute [extensionality] function.hfunext
 
 meta def options.list_names (o : options) : list name := o.fold [] (::)
 
-meta def format.intercalate (fm : format) (xs : list format) : format :=
-format.join $ list.intersperse fm xs
-
 namespace expr
 
 meta def bracket (p : ℕ) (fmt : format) (p' : ℕ) : format :=
