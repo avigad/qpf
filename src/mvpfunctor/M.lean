@@ -91,6 +91,9 @@ def M_dest' {α : typevec n} {x : P.last.M}
 def M_dest {α : typevec n} (x : P.M α) : P.apply (α.append1 (P.M α)) :=
 P.M_dest' (sigma.eta $ pfunctor.M_dest x.fst).symm x.snd
 
+def M_mk  {α : typevec n} : P.apply (α.append1 (P.M α)) → P.M α :=
+M_corec _ (λ i, append_fun id (M_dest P) <$$> i)
+
 theorem M_dest'_eq_dest' {α : typevec n} {x : P.last.M}
     {a₁ : P.A} {f₁ : P.last.B a₁ → P.last.M} (h₁ : pfunctor.M_dest x = ⟨a₁, f₁⟩)
     {a₂ : P.A} {f₂ : P.last.B a₂ → P.last.M} (h₂ : pfunctor.M_dest x = ⟨a₂, f₂⟩)
@@ -168,6 +171,20 @@ begin
   { exact IH _ _ (h'' _) }
 end
 
+-- theorem M_bisim' {β : typevec n} {α : Type*} (Q : α → Prop) (u v : α → M P β)
+--     (h : ∀ x, Q x → ∃ a f f',
+--       M_dest P (u x) = ⟨a, f⟩ ∧
+--       M_dest P (v x) = ⟨a, f'⟩ ∧
+--       ∀ i, ∃ x', Q x' ∧ f ⊚ _ = append_fun id u ∧ f' = _) :
+--   ∀ x, Q x → u x = v x :=
+-- λ x Qx,
+-- let R := λ w z : M P β, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
+-- @M_bisim n P β R
+--   (λ x y ⟨x', Qx', xeq, yeq⟩,
+--     let ⟨a, f, f', ux'eq, vx'eq, h'⟩ := h x' Qx' in
+--       ⟨a, f, f', xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, h'⟩)
+--   _ _ ⟨x, Qx, rfl, rfl⟩
+
 theorem M_dest_map {α β : typevec n} (g : α ⟹ β) (x : P.M α) :
   P.M_dest (g <$$> x) = append_fun g (λ x, g <$$> x) <$$> P.M_dest x :=
 begin
@@ -175,6 +192,25 @@ begin
   rw map_eq,
   conv { to_rhs, rw [M_dest, M_dest', map_eq, append_fun_comp_append_contents] },
   reflexivity
+end
+
+lemma M_mk_M_dest {α : typevec n} (x : P.M α) : M_mk P (M_dest P x) = x := sorry
+-- begin
+--   apply M_bisim' (λ x, true) (M_mk ∘ M_dest) _ _ _ trivial,
+--   clear x,
+--   intros x _,
+--   cases Mxeq : M_dest x with a f',
+--   have : M_dest (M_mk (M_dest x)) = ⟨a, _⟩,
+--   { rw [M_mk, M_dest_corec, Mxeq, pfunctor.map_eq, pfunctor.map_eq] },
+--   refine ⟨_, _, _, this, rfl, _⟩,
+--   intro i,
+--   exact ⟨f' i, trivial, rfl, rfl⟩
+-- end
+
+lemma M_dest_M_mk {α : typevec n} (x : P.apply (α.append1 $ P.M α)) : M_dest P (M_mk P x) = x :=
+begin
+  have : M_mk P ∘ M_dest P = @_root_.id (P.M α) := funext (M_mk_M_dest P),
+  rw [M_mk, M_dest_corec, ←comp_map, ←M_mk, ← append_fun_comp, this, id_comp, append_fun_id_id, id_map]
 end
 
 end mvpfunctor

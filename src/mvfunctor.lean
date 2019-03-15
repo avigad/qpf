@@ -116,7 +116,7 @@ lemma map_map (g : α ⟹ β) (h : β ⟹ γ) (x : F α) :
   h <$$> g <$$> x = (h ⊚ g) <$$> x :=
 eq.symm $ comp_map _ _ _
 
-end
+end mvfunctor
 /-
 Support for extending a typevec by one element.
 -/

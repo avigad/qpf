@@ -129,18 +129,14 @@ do let decl := declaration.cnst ind.name ind.u_names ind.type tt,
    (params,t) ← mk_local_pis decl.type,
    let params := ind.params ++ params,
    (m,m') ← live_vars n params,
-   -- trace m, trace m',
    let m := rb_map.sort prod.snd m.to_list,
    let m' := rb_map.sort prod.snd m'.to_list,
    u ← mk_meta_univ,
    let vars := string.intercalate "," (m.map to_string),
    (params.mmap' (λ e, infer_type e >>= unify (expr.sort u))
      <|> fail format!"live type parameters ({params}) are not in the same universe" : tactic _),
-   -- u' ← instantiate_mvars u,
-   -- trace format!"univ: {u'}",
    (level.succ u) ← get_univ_assignment u <|> pure level.zero.succ,
    ts ← (params.mmap infer_type : tactic _),
-   -- trace format!"univ: {ts}",
    pure { decl := decl,
           induct := ind,
           def_name := df_name,
@@ -191,10 +187,8 @@ do let trusted := func.decl.is_trusted,
    let vec := @expr.const tt ``_root_.typevec [func.vec_lvl] `(arity),
    v_arg ← mk_local_def `v_arg vec,
    t ← pis (func.dead_params.map prod.fst ++ [v_arg]) func.type,
-   -- trace "a",
    (_,df) ← @solve_aux unit t $ do
      { m' ← func.dead_params.mmap $ λ v, prod.mk v.2 <$> intro v.1.local_pp_name,
-       -- trace "- c",
        vs ← func.live_params.reverse.mmap $ λ x, do
          { refine ``(typevec.typevec_cases_cons _ _),
            x' ← intro x.1.local_pp_name,
@@ -202,12 +196,7 @@ do let trusted := func.decl.is_trusted,
        refine ``(typevec.typevec_cases_nil _),
        let args := (rb_map.sort prod.fst (m' ++ vs)).map prod.snd,
        let e := (@expr.const tt func.decl.to_name (func.decl.univ_params.map level.param)).mk_app args,
-       -- trace_state,
-       -- trace e,
-       -- infer_type e >>= trace,
-       -- trace "b",
        exact e },
-   -- trace "a",
    df ← instantiate_mvars df,
    add_decl $ declaration.defn func.def_name func.decl.univ_params t df (reducibility_hints.regular 1 tt) trusted
 
@@ -232,7 +221,6 @@ do let decl := func.decl,
    p ← mk_app `eq [lhs,rhs] >>= pis func.params,
    (_,pr) ← solve_aux p $ intros >> reflexivity,
    pr ← instantiate_mvars pr,
-   -- trace "unknown u",
    add_decl $ declaration.thm func.eqn_name decl.univ_params p (pure pr)
 
 -- meta def mk_internal_functor (n : name) : tactic internal_mvfunctor :=
@@ -244,13 +232,9 @@ do let decl := func.decl,
 
 meta def mk_internal_functor' (d : interactive.inductive_decl) : lean.parser internal_mvfunctor :=
 do d ← inductive_type.of_decl d,
-   -- trace d.u_params,
-   -- trace $ repr d,
    mk_inductive' d,
    func ← internalize_mvfunctor d,
-   -- trace $ repr func,
    mk_internal_functor_def func,
-   -- trace "foo",
    mk_internal_functor_eqn func,
    pure func
 
@@ -349,7 +333,6 @@ do map_d ← mk_mvfunctor_map func,
    df ← instantiate_mvars df,
    let inst_n := func.def_name <.> "mvfunctor",
    add_decl $ declaration.defn inst_n func.decl.univ_params t df (reducibility_hints.regular 1 tt) func.decl.is_trusted,
-   -- mk_const inst_n >>= infer_type >>= trace,
    set_basic_attribute `instance inst_n,
    pure ()
 
@@ -423,7 +406,6 @@ do let n := decl.name,
           let vec_t := @const tt ``typevec [u] (reflect arity),
           t ← pis (func.dead_params.map prod.fst ++ [hd_v]) vec_t,
           nil ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
-          -- trace "bar",
           vec ← func.live_params.reverse.mfoldr (λ e v,
             do c ← mk_const $ child_n ++ e.1.local_pp_name,
                let c := (@const tt (n <.> "child_t" ++ e.1.local_pp_name) func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst ++ [hd_v],
@@ -432,7 +414,6 @@ do let n := decl.name,
           -- vec ← mk_mapp ``_root_.id [vec_t,vec],
           df ← (instantiate_mvars vec >>= lambdas (func.dead_params.map prod.fst ++ [hd_v]) : tactic _),
           -- df ← instantiate_mvars vec,
-          -- trace df,
           let r := reducibility_hints.regular 1 tt,
           add_decl' $ declaration.defn child_n func.decl.univ_params t df r tt,
           -- pure { eqn_compiler.fun_def .
@@ -442,7 +423,6 @@ do let n := decl.name,
           --        type := vec_t,
           --        body := eqn_compiler.def_body.term df }
           pure () },
-   -- trace func.decl.to_name,
    -- eqn_compiler.add_fn func.decl.to_name eqns,
    pure $ expr.const child_n $ func.induct.u_params
 
@@ -459,8 +439,6 @@ do d ← inductive_type.of_pfunctor func,
    let n := d.name,
    let head_t := (@const tt (n <.> "head_t") func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst,
    let child_t := (@const tt (n <.> "child_t") func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst,
-   -- trace "foo",
-   -- (infer_type child_t >>= trace : tactic _),
    df ← (mk_mapp ``mvpfunctor.mk [some $ reflect arity, head_t,child_t] >>= lambdas (func.dead_params.map prod.fst) : tactic _),
    add_decl $ mk_definition func.pfunctor_name func.decl.univ_params t df,
    pure ()
@@ -477,7 +455,6 @@ do env ← get_env,
    r ← unify_app fn [reflect arity,out_t,vec_t],
    cs.mmap $ λ c,
      do { let p := c.update_prefix (c.get_prefix <.> "pfunctor"),
-          trace p,
           let hd_c := c.update_prefix (func.decl.to_name <.> "head_t"),
           let e := (@const tt c func.univ_params).mk_app func.params,
           (args,_) ← infer_type e >>= mk_local_pis,
@@ -515,18 +492,9 @@ do env ← get_env,
               exact m,
               pure () },
           let c' := c.update_prefix $ c.get_prefix <.> "mvpfunctor",
-          trace c',
           let vs := func.params ++ args,
-          -- trace $ vs.map expr.local_uniq_name,
-          -- trace $ r.list_local_consts.map expr.local_uniq_name,
-          -- trace $ df.list_local_consts.map expr.local_uniq_name,
-          -- trace $ args.map expr.local_uniq_name,
           r  ← pis vs r >>= instantiate_mvars,
           df ← instantiate_mvars df >>= lambdas vs,
-          -- trace df.list_local_consts,
-          -- let df := r.mk_sorry,
-          -- args.mmap infer_type >>= trace,
-          -- trace r,
           add_decl $ mk_definition c' func.decl.univ_params r df,
           pure () },
    pure ()
@@ -541,17 +509,15 @@ do v ← mk_meta_var t,
 meta def saturate (e : expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    saturate' t e
--- #check typevec_cases_cons₃
 
 meta def destruct_multimap : expr → tactic unit
 | e :=
 do `(%%t ⟹ _) ← infer_type e,
-   `(typevec %%n) ← infer_type t, -- trace n,
+   `(typevec %%n) ← infer_type t,
     if ¬ n.is_napp_of ``has_zero.zero 1
       then do
         refine ``(typevec_cases_cons₂ %%n _ _ _ _ _ %%e),
         f ← intro `f, e' ← intro1,
-        -- trace "*", trace_state,
         destruct_multimap e'
       else pure ()
 
@@ -565,11 +531,8 @@ do let u := fresh_univ func.induct.u_names,
         let e := (@expr.const tt n func.induct.u_params).mk_app (func.params ++ c.args),
         pis c.args (C e) >>= mk_local_def `v },
    n ← mk_local_def `n fn,
-   -- trace "-",
    (_,df) ← solve_aux (expr.pis [n] $ C n) $ do
      { n ← intro1, [(_, [x,y], _)] ← cases_core n,
-       -- infer_type x >>= trace,
-       -- infer_type y >>= trace,
        cases x, gs ← get_goals, -- case distinction of n_snd as a vector
        gs ← mzip_with (λ h g,
          do { set_goals [g],
@@ -589,10 +552,7 @@ do let u := fresh_univ func.induct.u_names,
    let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t,
    df ← instantiate_mvars df >>= lambdas vs,
    t ← pis (vs ++ [n]) (C n),
-   -- trace "-",
-   -- trace t,
    add_decl $ declaration.thm (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t (pure df),
-   -- trace "-",
    pure ()
 
 -- #print internal_mvfunctor
@@ -638,7 +598,6 @@ do let n := func.live_params.length,
    mk_qpf_repr func,
    pfunctor_i ← mk_mapp ``mvfunctor [some (reflect n),e] >>= mk_instance,
    mvqpf_t ← mk_mapp ``mvqpf [some (reflect n),e,pfunctor_i] >>= instantiate_mvars,
-   -- infer_type mvqpf_t >>= trace,
    (_,df) ← solve_aux mvqpf_t $ do
      { let p := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
        refine ``( { P := %%p, abs := %%abs_fn, repr' := %%repr_fn, .. } ),
@@ -648,7 +607,7 @@ do let n := func.live_params.length,
    let inst_n := func.def_name <.> "mvqpf",
    add_decl $ mk_definition inst_n func.induct.u_names mvqpf_t df,
    set_basic_attribute `instance inst_n
--- #exit
+
 -- @[derive_handler] meta def qpf_derive_handler : derive_handler :=
 -- λ p n,
 -- if p.is_constant_of ``mvqpf then

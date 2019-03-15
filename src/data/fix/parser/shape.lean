@@ -49,20 +49,14 @@ meta def decl_kind : declaration → string
 
 meta def mk_fixpoint (fix : name) (func d : internal_mvfunctor) : tactic unit :=
 do let dead := func.dead_params.map prod.fst,
-   -- let n := dead.length,
    let shape := (@const tt (func.decl.to_name <.> "internal") func.induct.u_params).mk_app dead,
-   -- trace "shape", trace n,
-   -- df ← to_expr ``(mvqpf.fix %%shape),
-   -- trace "shape",
    df ← (mk_mapp fix [none,shape,none,none] >>= lambdas dead : tactic _),
    t ← infer_type df,
-   -- trace "→ → shape", trace t, trace df, trace func.decl.to_name,
    let intl_n := func.decl.to_name.get_prefix <.> "internal",
    add_decl $ mk_definition intl_n func.induct.u_names t df,
    v ← mk_live_vec func.vec_lvl $ func.live_params.init.map prod.fst,
    df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app (d.dead_params.map prod.fst ++ [v]),
    t  ← infer_type df,
-   -- trace "- fixpoint", trace func.decl.to_name.get_prefix, trace df, trace t,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()
 
