@@ -7,32 +7,35 @@ open interactive lean lean.parser
 meta def mk_constr (d : internal_mvfunctor) : tactic unit :=
 do d.induct.ctors.mmap' $ λ c : type_cnstr,
      do { t ← type_cnstr.type d.induct c >>= pis d.params ,
-          trace format!"{c.name} : {t}",
+          -- trace format!"{c.name} : {t}",
           let df := t.mk_sorry,
           add_decl $ mk_definition c.name d.induct.u_names t df }
 
 open expr
 
-meta def mk_corecursor (d : internal_mvfunctor) : tactic unit :=
+meta def mk_corecursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let u := fresh_univ d.induct.u_names,
    let t := (@const tt d.decl.to_name d.induct.u_params).mk_app d.params,
    -- trace "→ infer_type ←",
    -- infer_type t' >>= trace,
-   x ← mk_local' `α' binder_info.implicit $ sort (level.succ d.vec_lvl),
+   -- x ← mk_local' `α' binder_info.implicit $ sort (level.succ d.vec_lvl),
+   let x := func.hole,
    v ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst,
    v' ← mk_live_vec d.vec_lvl $ x :: d.live_params.map prod.fst,
+   trace "",
    infer_type v' >>= trace,
+   infer_type v >>= trace,
    -- infer_type x >>= trace,
    let u_params := d.induct.u_params,
    let n := d.decl.to_name,
    let shape_n := n <.> "shape",
    let internal_eq_n := shape_n <.> "internal_eq",
    let t' := (@const tt (shape_n <.> "internal") d.induct.u_params), -- .mk_app [v'],
-   let ft := imp x $ (@const tt shape_n u_params).mk_app $ d.params ++ [x],
+   let ft := imp x $ (@const tt shape_n u_params).mk_app $ func.params,
    -- let ft := imp x $ (@const tt shape_n u_params).mk_app $ x :: d.params,
    let intl_eq := (@const tt internal_eq_n u_params).mk_app $ d.params,
    trace "== LET ==",
-   infer_type (@const tt shape_n u_params) >>= trace,
+   -- infer_type (@const tt shape_n u_params) >>= trace,
    infer_type intl_eq >>= trace,
    trace format!"ft: {ft}",
    trace format!"t': {t'}",
@@ -44,7 +47,7 @@ do let u := fresh_univ d.induct.u_names,
    trace " *** ",
    -- mk_const ``mvqpf.cofix.corec >>= infer_type >>= trace,
    infer_type fn' >>= trace,
-   df' ← mk_mapp ``mvqpf.cofix.corec [none,t',none,none],
+   df' ← mk_mapp ``mvqpf.cofix.corec [none,t',none,none,v,x],
    infer_type df' >>= trace,
    df ← mk_mapp ``mvqpf.cofix.corec [none,t',none,none,v,x,fn'],
    -- let n := (d.decl.to_name <.> "shape" <.> "internal"),
@@ -63,19 +66,19 @@ do let u := fresh_univ d.induct.u_names,
 
 -- nat''.shape.internal_eq : ∀ (α_1 : Type), nat''.shape.internal ⦃ α_1 ⦄ = shape α_1
 
-@[user_command]
-meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
-do d ← inductive_decl.parse meta_info,
-   d ← mk_datatype ``mvqpf.fix d,
-   trace_error $ mk_constr d,
-   pure ()
+-- @[user_command]
+-- meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
+-- do d ← inductive_decl.parse meta_info,
+--    d ← mk_datatype ``mvqpf.fix d,
+--    trace_error $ mk_constr d,
+--    pure ()
 
 @[user_command]
 meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
-   d ← mk_datatype ``mvqpf.cofix d,
+   (func,d) ← mk_datatype ``mvqpf.cofix d,
    trace_error $ mk_constr d,
-   trace_error $ mk_corecursor d,
+   trace_error $ mk_corecursor func d,
    pure ()
 
 end tactic
@@ -89,7 +92,7 @@ codata nat''
 | succ : nat'' → nat''
 
 -- -- #print nat'.internal
-#print prefix nat''.corec
+-- #print prefix nat''.corec
 
 universes u
 namespace hidden
@@ -100,13 +103,26 @@ namespace hidden
 
 -- #print hidden.list.internal
 -- #print hidden.list
-set_option trace.app_builder true
+-- set_option trace.app_builder true
+-- set_option debugger true
 
--- codata stream (α : Type u) : Type u
--- | zero : stream
--- | succ : α → stream → stream
+-- local attribute [vm_monitor] stack_trace
 
--- #print hidden.stream.internal
--- #print hidden.stream
+codata stream (α : Type u) : Type u
+| zero : stream
+| succ : α → stream → stream
+
+#print hidden.stream.internal
+#print hidden.stream
+#print hidden.stream.corec
+
+codata stream' (α : Type u) : Type u
+| zero : stream'
+| succ : α → (ℤ → stream') → stream'
+
+#print hidden.stream'.internal
+#print hidden.stream'
+#print hidden.stream'.shape
+#print hidden.stream'.corec
 
 end hidden

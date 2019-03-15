@@ -195,7 +195,7 @@ do let trusted := func.decl.is_trusted,
    (_,df) ← @solve_aux unit t $ do
      { m' ← func.dead_params.mmap $ λ v, prod.mk v.2 <$> intro v.1.local_pp_name,
        -- trace "- c",
-       vs ← func.live_params.mmap $ λ x, do
+       vs ← func.live_params.reverse.mmap $ λ x, do
          { refine ``(typevec.typevec_cases_cons _ _),
            x' ← intro x.1.local_pp_name,
            pure (x.2,x') },
@@ -213,11 +213,11 @@ do let trusted := func.decl.is_trusted,
 
 meta def mk_live_vec (u : level) (vs : list expr) : tactic expr :=
 do nil ← mk_mapp ``fin'.elim0 [@expr.sort tt $ level.succ u],
-   vs.mfoldr (λ e s, mk_mapp ``typevec.append1 [none,s,e]) nil
+   vs.reverse.mfoldr (λ e s, mk_mapp ``typevec.append1 [none,s,e]) nil
 
 meta def mk_map_vec (u : level) (vs : list expr) : tactic expr :=
 do let nil := @expr.const tt ``typevec.nil_fun [u,u],
-   vs.mfoldr (λ e s,
+   vs.reverse.mfoldr (λ e s,
      mk_mapp ``typevec.append_fun [none,none,none,none,none,s,e]) nil
 
 meta def mk_internal_functor_app (func : internal_mvfunctor) : tactic expr :=
@@ -257,7 +257,7 @@ do d ← inductive_type.of_decl d,
 open typevec
 
 meta def destruct_typevec (func : internal_mvfunctor) (v : name) : tactic (list $ expr × expr × expr × ℕ) :=
-do vs ← func.live_params.mmap $ λ x : expr × ℕ, do
+do vs ← func.live_params.reverse.mmap $ λ x : expr × ℕ, do
      { refine ``(typevec_cases_cons₃ _ _),
        α ← get_unused_name `α >>= intro,
        β ← get_unused_name `β >>= intro,
@@ -349,7 +349,7 @@ do map_d ← mk_mvfunctor_map func,
    df ← instantiate_mvars df,
    let inst_n := func.def_name <.> "mvfunctor",
    add_decl $ declaration.defn inst_n func.decl.univ_params t df (reducibility_hints.regular 1 tt) func.decl.is_trusted,
-   mk_const inst_n >>= infer_type >>= trace,
+   -- mk_const inst_n >>= infer_type >>= trace,
    set_basic_attribute `instance inst_n,
    pure ()
 
@@ -423,8 +423,8 @@ do let n := decl.name,
           let vec_t := @const tt ``typevec [u] (reflect arity),
           t ← pis (func.dead_params.map prod.fst ++ [hd_v]) vec_t,
           nil ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
-          trace "bar",
-          vec ← func.live_params.mfoldr (λ e v,
+          -- trace "bar",
+          vec ← func.live_params.reverse.mfoldr (λ e v,
             do c ← mk_const $ child_n ++ e.1.local_pp_name,
                let c := (@const tt (n <.> "child_t" ++ e.1.local_pp_name) func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst ++ [hd_v],
                mv ← mk_mvar,
@@ -442,7 +442,7 @@ do let n := decl.name,
           --        type := vec_t,
           --        body := eqn_compiler.def_body.term df }
           pure () },
-   trace func.decl.to_name,
+   -- trace func.decl.to_name,
    -- eqn_compiler.add_fn func.decl.to_name eqns,
    pure $ expr.const child_n $ func.induct.u_params
 
@@ -459,8 +459,8 @@ do d ← inductive_type.of_pfunctor func,
    let n := d.name,
    let head_t := (@const tt (n <.> "head_t") func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst,
    let child_t := (@const tt (n <.> "child_t") func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst,
-   trace "foo",
-   (infer_type child_t >>= trace : tactic _),
+   -- trace "foo",
+   -- (infer_type child_t >>= trace : tactic _),
    df ← (mk_mapp ``mvpfunctor.mk [some $ reflect arity, head_t,child_t] >>= lambdas (func.dead_params.map prod.fst) : tactic _),
    add_decl $ mk_definition func.pfunctor_name func.decl.univ_params t df,
    pure ()
@@ -477,6 +477,7 @@ do env ← get_env,
    r ← unify_app fn [reflect arity,out_t,vec_t],
    cs.mmap $ λ c,
      do { let p := c.update_prefix (c.get_prefix <.> "pfunctor"),
+          trace p,
           let hd_c := c.update_prefix (func.decl.to_name <.> "head_t"),
           let e := (@const tt c func.univ_params).mk_app func.params,
           (args,_) ← infer_type e >>= mk_local_pis,
@@ -514,7 +515,7 @@ do env ← get_env,
               exact m,
               pure () },
           let c' := c.update_prefix $ c.get_prefix <.> "mvpfunctor",
-          -- trace c',
+          trace c',
           let vs := func.params ++ args,
           -- trace $ vs.map expr.local_uniq_name,
           -- trace $ r.list_local_consts.map expr.local_uniq_name,
@@ -545,12 +546,12 @@ do t ← infer_type e >>= whnf,
 meta def destruct_multimap : expr → tactic unit
 | e :=
 do `(%%t ⟹ _) ← infer_type e,
-   `(typevec %%n) ← infer_type t, trace n,
+   `(typevec %%n) ← infer_type t, -- trace n,
     if ¬ n.is_napp_of ``has_zero.zero 1
       then do
         refine ``(typevec_cases_cons₂ %%n _ _ _ _ _ %%e),
         f ← intro `f, e' ← intro1,
-        trace "*", trace_state,
+        -- trace "*", trace_state,
         destruct_multimap e'
       else pure ()
 
@@ -564,11 +565,11 @@ do let u := fresh_univ func.induct.u_names,
         let e := (@expr.const tt n func.induct.u_params).mk_app (func.params ++ c.args),
         pis c.args (C e) >>= mk_local_def `v },
    n ← mk_local_def `n fn,
-   trace "-",
+   -- trace "-",
    (_,df) ← solve_aux (expr.pis [n] $ C n) $ do
      { n ← intro1, [(_, [x,y], _)] ← cases_core n,
-       infer_type x >>= trace,
-       infer_type y >>= trace,
+       -- infer_type x >>= trace,
+       -- infer_type y >>= trace,
        cases x, gs ← get_goals, -- case distinction of n_snd as a vector
        gs ← mzip_with (λ h g,
          do { set_goals [g],
@@ -583,17 +584,18 @@ do let u := fresh_univ func.induct.u_names,
 
               get_goals }) cases_t gs,
        set_goals gs.join,
-       trace_state },
+       -- trace_state,
+       pure () },
    let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t,
    df ← instantiate_mvars df >>= lambdas vs,
    t ← pis (vs ++ [n]) (C n),
-   trace "-",
-   trace t,
+   -- trace "-",
+   -- trace t,
    add_decl $ declaration.thm (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t (pure df),
-   trace "-",
+   -- trace "-",
    pure ()
 
-#print internal_mvfunctor
+-- #print internal_mvfunctor
 
 meta def mk_qpf_abs (func : internal_mvfunctor) : tactic unit :=
 do let n := func.live_params.length,
@@ -636,7 +638,7 @@ do let n := func.live_params.length,
    mk_qpf_repr func,
    pfunctor_i ← mk_mapp ``mvfunctor [some (reflect n),e] >>= mk_instance,
    mvqpf_t ← mk_mapp ``mvqpf [some (reflect n),e,pfunctor_i] >>= instantiate_mvars,
-   infer_type mvqpf_t >>= trace,
+   -- infer_type mvqpf_t >>= trace,
    (_,df) ← solve_aux mvqpf_t $ do
      { let p := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
        refine ``( { P := %%p, abs := %%abs_fn, repr' := %%repr_fn, .. } ),
@@ -785,19 +787,41 @@ qpf list_F'' (α β γ : Type u)
 -- #check list_F''.internal_eq
 -- #check @list_F''.map
 
+-- example : ∀ (α : Type*) (β : Type*) (γ : Type*),
+--     list_F''.internal α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil)) = list_F'' α β γ :=
+-- list_F''.internal_eq
 
+-- example : Π (α : Type*) (β : Type*) (α_1 β_1 : typevec 1),
+--     α_1 ⟹ β_1 → list_F''.internal α β α_1 → list_F''.internal α β β_1 :=
+-- @list_F''.internal.map
 
 -- #test hidden.list_F''.internal.map._equation_0
 -- #test hidden.list_F''.internal.map._equation_1
 
 -- #check list_F''.internal.map
 
+-- example : ∀ (α : Type u_1) (β : Type u_1) (γ γ' : Type u_1) (f2 : γ → γ') (a : β → γ),
+--   list_F''.internal.map α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil))
+--       (typevec.of_ind (typevec.ind.cons γ' typevec.ind.nil))
+--       (typevec.append_fun typevec.nil_fun f2)
+--       _ =
+--     list_F''.nil α (λ (a_1 : β), f2 (a a_1)) :=
+-- list_F''.internal.map._equation_0
 
+-- example : ∀ (α : Type u_1) (β : Type u_1) (γ γ' : Type u_1) (f2 : γ → γ') (a : α → β),
+--   list_F''.internal.map α β (typevec.of_ind (typevec.ind.cons γ typevec.ind.nil))
+--       (typevec.of_ind (typevec.ind.cons γ' typevec.ind.nil))
+--       (typevec.append_fun typevec.nil_fun f2)
+--       _ =
+--     list_F''.cons γ' (λ (a_1 : α), a a_1) :=
+-- list_F''.internal.map._equation_1
 
 -- @[derive mvqpf]
 qpf list_F''' (α β γ : Type u)
 | nil : list_F'''
 | cons : (γ → β) → list_F'''
+
+#check hidden.list_F'''.mvpfunctor.cons
 
 -- #exit
 -- #print hidden.list_F'''.head_t
@@ -841,7 +865,8 @@ qpf list_F'''' (α β γ : Type u)
 | nil : (β → γ) → (γ → α) → list_F''''
 | cons : (α → β) → list_F''''
 
-#check hidden.list_F'''.mvpfunctor.cons
+#print prefix hidden.list_F''''
+#check hidden.list_F''''.mvpfunctor.cons
 
 -- #print hidden.list_F''''.head_t
 -- #print hidden.list_F''''.child_t
@@ -850,6 +875,9 @@ qpf list_F'''' (α β γ : Type u)
 -- #check @list_F''''.internal_eq
 -- #check @list_F''''.internal.map
 
+-- example : ∀ (α : Type*) (β : Type*) (γ : Type*),
+--     list_F''''.internal α β γ (typevec.of_ind typevec.ind.nil) = list_F'''' α β γ :=
+-- @list_F''''.internal_eq
 
 example : Π (α : Type*) (β : Type*) (γ : Type*) (α_1 β_1 : typevec 0),
     α_1 ⟹ β_1 → list_F''''.internal α β γ α_1 → list_F''''.internal α β γ β_1 :=

@@ -619,3 +619,12 @@ meta def parsable_printer (e : expr) : format := parsable_printer' e [] 10
 meta def as_binder (e : expr) := fmt_binder e.local_pp_name e.binding_info (parsable_printer e.local_type)
 
 end expr
+
+meta def stack_trace : vm_monitor ℕ :=
+{ init := 0,
+  step := λ i,
+  do j ← vm.stack_size,
+     if i = j then pure i else do
+       fn ← vm.curr_fn,
+       vm.put_str $ (list.repeat ' ' j).as_string ++ fn.to_string,
+       pure j }
