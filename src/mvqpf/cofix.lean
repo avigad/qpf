@@ -91,6 +91,9 @@ begin
   rw [corecF_eq, abs_map, abs_repr, ←comp_map, ←append_fun_comp], reflexivity
 end
 
+def cofix.mk {α : typevec n} : F (α.append1 $ cofix F α) → cofix F α :=
+cofix.corec (λ x, append_fun id (λ i : cofix F α, cofix.dest.{u} i) <$$> x)
+
 private theorem cofix.bisim_aux {α : typevec n}
     (r : cofix F α → cofix F α → Prop)
     (h' : ∀ x, r x x)
@@ -144,9 +147,17 @@ begin
   right, exact rxy
 end
 
+lemma cofix.mk_dest {α : typevec n} (x : cofix F α) : cofix.mk (cofix.dest x) = x :=
+sorry
+
+lemma cofix.dest_mk {α : typevec n} (x : F (α.append1 $ cofix F α)) : cofix.dest (cofix.mk x) = x :=
+begin
+  have : cofix.mk ∘ cofix.dest = @_root_.id (cofix F α) := funext cofix.mk_dest,
+  rw [cofix.mk, cofix.dest_corec, ←comp_map, ←cofix.mk, ← append_fun_comp, this, id_comp, append_fun_id_id, id_map]
+end
+
 noncomputable instance mvqpf_cofix (α : typevec n) : mvqpf (cofix F) :=
-{
-  P         := q.P.Mp,
+{ P         := q.P.Mp,
   abs       := λ α, quot.mk Mcongr,
   repr'     := λ α, quot.out,
   abs_repr' := λ α, quot.out_eq,
