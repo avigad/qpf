@@ -14,7 +14,10 @@ meta structure type_cnstr :=
 (args : list expr)
 (result : list expr)
 
-@[derive [has_reflect]]
+meta instance : has_to_format type_cnstr :=
+{ to_format := λ ⟨n,a,r⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
+
+@[derive [has_reflect,has_to_format]]
 meta structure inductive_type :=
 (pre : name)
 (name : name)
@@ -25,7 +28,7 @@ meta structure inductive_type :=
 (ctors : list type_cnstr)
 
 meta instance inductive_type.has_to_tactic_format : has_to_tactic_format inductive_type :=
-{ to_tactic_format := λ a, pp $ reflect a }
+{ to_tactic_format := λ a, pure $ to_fmt a }
 
 meta def inductive_type.u_params (decl : inductive_type) :=
 decl.u_names.map level.param

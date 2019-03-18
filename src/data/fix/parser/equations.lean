@@ -5,8 +5,8 @@ namespace tactic
 open interactive lean lean.parser
 open expr
 
-#check mvqpf.cofix.dest
-#check mvqpf.cofix.mk
+meta def trace' {α} (x : α) [has_to_tactic_format α] : tactic α :=
+x <$ trace x
 
 meta def mk_constr (mk_fn : name) (d : internal_mvfunctor) : tactic unit :=
 do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
@@ -22,6 +22,34 @@ do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
           t ← pis d.params t,
           add_decl $ mk_definition c.name d.induct.u_names t df }
 
+meta def mk_destr (dest_fn mk_fn mk_dest_eqn : name) (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
+   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [my_t]),
+   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
+   let my_shape_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   let u_params := d.induct.u_params,
+   let u := fresh_univ d.induct.u_names,
+   let intl_eq := (@const tt (d.induct.name <.> "shape" <.> "internal_eq") u_params).mk_app (d.params ++ [my_t]),
+   v_t ← mk_local_def `x (my_shape_t vec),
+   C ← mk_local' `C binder_info.implicit (my_t.imp (sort $ level.param u)),
+   let n := d.live_params.length,
+   C' ← mk_mapp mk_fn [reflect n,my_shape_t,none,none,vec',v_t] >>= lambdas [v_t] ∘ C,
+   cs ← d.induct.ctors.mmap $ λ c : type_cnstr,
+     do { let t := (@const tt c.name u_params).mk_app d.params ,
+          (vs,_) ← infer_type t >>= mk_local_pis,
+          x ← pis vs (C $ t.mk_app vs),
+          v ← mk_local_def `v x,
+          pure (v) },
+   n ← mk_local_def `n my_t,
+   n' ← mk_app dest_fn [n],
+   let vs := d.params ++ [C,n] ++ cs,
+   rec_t ← pis vs (C n),
+   let shape_cases := (@const tt (d.induct.name <.> "shape" <.> "cases_on") $ level.param u :: u_params).mk_app (d.params ++ [my_t,C',n'] ++ cs),
+   shape_cases ← mk_app mk_dest_eqn [n] >>= mk_congr_arg C >>= flip mk_eq_mp shape_cases,
+   df ← lambdas vs shape_cases,
+   add_decl $ mk_definition (d.induct.name <.> "cases_on") (u :: d.induct.u_names) rec_t df,
+   pure ()
+
 meta def mk_corecursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let u := fresh_univ d.induct.u_names,
    let t := (@const tt d.decl.to_name d.induct.u_params).mk_app d.params,
@@ -32,7 +60,7 @@ do let u := fresh_univ d.induct.u_names,
    let n := d.decl.to_name,
    let shape_n := n <.> "shape",
    let internal_eq_n := shape_n <.> "internal_eq",
-   let t' := (@const tt (shape_n <.> "internal") d.induct.u_params), -- .mk_app [v'],
+   let t' := (@const tt (shape_n <.> "internal") d.induct.u_params).mk_app $ func.dead_params.map prod.fst,
    let ft := imp x $ (@const tt shape_n u_params).mk_app $ func.params,
    let intl_eq := (@const tt internal_eq_n u_params).mk_app $ d.params,
    fn ← mk_local_def `f ft,
@@ -51,6 +79,7 @@ meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.fix d,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
+   trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
    pure ()
 
 @[user_command]
@@ -58,6 +87,7 @@ meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : pa
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.cofix d,
    trace_error $ mk_constr ``mvqpf.cofix.mk d,
+   trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
    trace_error $ mk_corecursor func d,
    pure ()
 
@@ -86,12 +116,8 @@ data list (α : Type u) : Type u
 | zero : list
 | succ : α → list → list
 
--- #print hidden.list.internal
--- #print hidden.list
--- set_option trace.app_builder true
--- set_option debugger true
-
--- local attribute [vm_monitor] stack_trace
+#print hidden.list.internal
+#print hidden.list
 
 codata stream (α : Type u) : Type u
 | zero : stream
@@ -99,17 +125,19 @@ codata stream (α : Type u) : Type u
 
 #print hidden.stream.internal
 #print hidden.stream
+#print hidden.stream.cases_on
 #print hidden.stream.corec
 #print hidden.stream.zero
 #print hidden.stream.succ
 
-codata stream' (α : Type u) : Type u
-| zero : stream'
-| succ : α → (ℤ → stream') → stream'
+codata stream' (γ α β γ' : Type u) : Type u
+| zero : γ → stream'
+| succ : γ' → α → (ℤ → β → stream') → stream'
 
 #print hidden.stream'.internal
 #print hidden.stream'
 #check hidden.stream'.zero
+#print hidden.stream'.cases_on
 #check @hidden.stream'.succ
 #print hidden.stream'.shape
 #print hidden.stream'.corec

@@ -47,22 +47,23 @@ do some f ← pure $ m.find v | pure e,
 meta def map_arg (m : rb_map expr expr) (e : expr) : tactic expr :=
 infer_type e >>= whnf >>= map_arg' m e
 
-meta def find_dead_occ : rb_map expr ℕ → expr → rb_map expr ℕ
+meta def find_dead_occ (n : name) (ps : list expr) : rb_map expr ℕ → expr → rb_map expr ℕ
 | m `(%%a → %%b) := find_dead_occ (a.list_local_consts.foldl rb_map.erase m) b
 | m (expr.local_const _ _ _ _) := m
-| m e := e.list_local_consts.foldl rb_map.erase m
+| m e :=
+if e.get_app_fn.const_name = n
+  then m
+  else e.list_local_consts.foldl rb_map.erase m
 
-meta def live_vars (n : name) (params : list expr) : tactic $ rb_map expr ℕ × rb_map expr ℕ :=
-do let vs := rb_map.of_list $ params.enum.map prod.swap,
-   env ← get_env,
-   let ls := env.constructors_of n,
+meta def live_vars (induct : inductive_type) : tactic $ rb_map expr ℕ × rb_map expr ℕ :=
+do let n := induct.name,
+   let params : list expr := induct.params,
+   let e := (@expr.const tt n induct.u_params).mk_app params,
+   let vs := rb_map.of_list $ params.enum.map prod.swap,
+   let ls := induct.ctors,
    ls ← ls.mmap $ λ c,
-     do { c ← mk_const c,
-          let x := c.mk_app params,
-          (ps,_) ← infer_type x >>= mk_local_pis,
-          ts ← ps.mmap infer_type,
-          let r := ts.foldl find_dead_occ vs,
-          pure $ ts.foldl find_dead_occ vs },
+     do { ts ← c.args.mmap infer_type,
+          pure $ ts.foldl (find_dead_occ n params) vs },
    let m := ls.foldl rb_map.intersect vs,
    m.mfilter $ λ e _, expr.is_sort <$> infer_type e,
    let m' := vs.difference m,
@@ -128,7 +129,7 @@ do let decl := declaration.cnst ind.name ind.u_names ind.type tt,
    -- decl ← get_decl n,
    (params,t) ← mk_local_pis decl.type,
    let params := ind.params ++ params,
-   (m,m') ← live_vars n params,
+   (m,m') ← live_vars ind,
    let m := rb_map.sort prod.snd m.to_list,
    let m' := rb_map.sort prod.snd m'.to_list,
    u ← mk_meta_univ,
