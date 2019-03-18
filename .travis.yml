@@ -3,12 +3,21 @@ sudo: false
 os:
     - linux
 
+addons:
+  apt:
+    sources: deadsnakes
+    update: true
+    packages:
+      - python3.6
+
 cache:
   directories:
     - $TRAVIS_BUILD_DIR/*/
     - $HOME/.elan
 
 install:
+  - git config --add github.user $GITHUB_USER
+  - git config --add github.oauthtoken $GITHUB_TOKEN
   - |
     if [ ! -d "$HOME/.elan/toolchains/" ]; then
       curl https://raw.githubusercontent.com/Kha/elan/master/elan-init.sh -sSf | sh -s -- --default-toolchain none -y
@@ -18,13 +27,23 @@ install:
   - export PATH="$HOME/scripts:$PATH"
   - cp travis_long.sh $HOME/scripts/travis_long
   - chmod +x $HOME/scripts/travis_long
-  - curl https://raw.githubusercontent.com/leanprover-community/mathlib/master/scripts/remote-install-update-mathlib.sh -sSf | sh
+  - python3.6 --version
+  # - python3.6 -m pip --version             # <<< fails
+  # - sudo python3.6 -m ensurepip --upgrade  # <<< fails
+  - python3.6 -m venv env --without-pip
+  - source env/bin/activate
+  - curl https://bootstrap.pypa.io/get-pip.py | python3.6
+  - python3.6 -m pip --version
+  - python3.6 -m pip install --upgrade pip
+  - curl https://raw.githubusercontent.com/leanprover-community/mathlib/master/scripts/remote-install-update-mathlib.sh -sSf | sh  || true
+  - export PATH=~/.mathlib/bin/:$PATH
   - update-mathlib
   - (git status | grep  -e "Changes not staged for commit:"); RESULT=$?
   - if [ $RESULT -eq 0 ]; then git checkout -f HEAD ; fi
   - git clean -d -f -q
   - ./purge_olean.sh
   - rm mathlib.txt || true
+
 
 jobs:
   include:
