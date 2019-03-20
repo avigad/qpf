@@ -218,7 +218,7 @@ def arrow.mp {α β : typevec n} (h : α = β) : α ⟹ β
 def arrow.mpr {α β : typevec n} (h : α = β) : β ⟹ α
 | i := eq.mpr (congr_fun h _)
 
-def to_append1_drop_last {α : typevec (n+1)} : α ⟹ append1 (drop α) (last α) :=
+def to_append1_drop_last {α : typevec (n+1)} : α ⟹ drop α ::: last α :=
 arrow.mpr (append1_drop_last _)
 
 -- def from_append1_drop_last {α : typevec (n+1)} : α ⟹ append1 (drop α) (last α) :=
@@ -329,7 +329,7 @@ theorem last_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α�
   last_fun (f₁ ⊚ f₀) = last_fun f₁ ∘ last_fun f₀ := rfl
 
 theorem append_fun_aux {α α' : typevec n} {β β' : Type*}
-  (f : append1 α β ⟹ append1 α' β') : append_fun (drop_fun f) (last_fun f) = f :=
+  (f : α ::: β ⟹ α' ::: β') : append_fun (drop_fun f) (last_fun f) = f :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
 -- @[simp]
@@ -387,7 +387,7 @@ def typevec_cases_nil {β : typevec 0 → Sort*} (f : β fin'.elim0) :
   Π v, β v :=
 λ v, ♯ f
 
-def typevec_cases_cons (n : ℕ) {β : typevec (n+1) → Sort*} (f : Π t (v : typevec n), β (typevec.append1 v t)) :
+def typevec_cases_cons (n : ℕ) {β : typevec (n+1) → Sort*} (f : Π t (v : typevec n), β (v ::: t)) :
   Π v, β v :=
 λ v, ♯ f v.last v.drop
 
@@ -409,7 +409,7 @@ begin
 end
 
 def typevec_cases_cons₃ (n : ℕ) {β : Π v v' : typevec (n+1), v ⟹ v' → Sort*}
-  (f : Π t t' (f : t → t') (v v' : typevec n) (fs : v ⟹ v'), β (append1 v t) (append1 v' t') (append_fun fs f)) :
+  (f : Π t t' (f : t → t') (v v' : typevec n) (fs : v ⟹ v'), β (v ::: t) (v' ::: t') (append_fun fs f)) :
   Π v v' f, β v v' f :=
 λ v v' fs,
 begin
@@ -417,7 +417,7 @@ begin
   congr' 1, repeat { simp  }, ext : 1; simp, admit,
 end
 
-def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (append1 v t) ⟹ (append1 v' t') → Sort*}
+def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v ::: t) ⟹ (v' ::: t') → Sort*}
   (f : Π (f : t → t') (fs : v ⟹ v'), β (append_fun fs f)) :
   Π f, β f := sorry
 
