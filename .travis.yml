@@ -1,4 +1,4 @@
-language: c
+language: python
 sudo: false
 os:
     - linux
@@ -14,6 +14,7 @@ cache:
   directories:
     - $TRAVIS_BUILD_DIR/*/
     - $HOME/.elan
+    - $HOME/.mathlib
 
 install:
   - git config --add github.user $GITHUB_USER
@@ -22,7 +23,6 @@ install:
     if [ ! -d "$HOME/.elan/toolchains/" ]; then
       curl https://raw.githubusercontent.com/Kha/elan/master/elan-init.sh -sSf | sh -s -- --default-toolchain none -y
     fi
-  - source ~/.elan/env
   - mkdir $HOME/scripts || echo ""
   - export PATH="$HOME/scripts:$PATH"
   - cp travis_long.sh $HOME/scripts/travis_long
@@ -43,7 +43,7 @@ install:
   - git clean -d -f -q
   - ./purge_olean.sh
   - rm mathlib.txt || true
-
+  - source ~/.elan/env
 
 jobs:
   include:
