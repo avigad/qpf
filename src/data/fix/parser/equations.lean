@@ -50,6 +50,33 @@ do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
    add_decl $ mk_definition (d.induct.name <.> "cases_on") (u :: d.induct.u_names) rec_t df,
    pure ()
 
+meta def mk_recursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app func.params,
+   let u_params := d.induct.u_params,
+   let X := to_implicit func.hole,
+   let intl_eq := (@const tt (d.induct.name <.> "shape" <.> "internal_eq") u_params).mk_app (d.params ++ [X]),
+   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
+   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [X]),
+   x ← mk_local_def `x (my_shape_intl_t vec),
+   v_t ← mk_local_def `x my_shape_t,
+   C ← lambdas [v_t] X,
+   v_t ← mk_eq_mp intl_eq x,
+   let cases_on := d.induct.name <.> "shape" <.> "cases_on",
+   let cases_u : list level := level.succ d.vec_lvl :: d.induct.u_params,
+   let fs := (@const tt cases_on $ cases_u).mk_app $ func.params ++ [C,v_t],
+   (vs,_) ← infer_type fs >>= mk_local_pis,
+   vs ← mzip_with (λ l (c : type_cnstr),
+     do { (args,t) ← infer_type l >>= mk_local_pis,
+          head_beta t >>= pis args >>= mk_local_def l.local_pp_name }) vs d.induct.ctors,
+   fn ← lambdas [x] (fs.mk_app vs),
+   arg ← mk_local_def `y $ (@const tt d.induct.name d.induct.u_params).mk_app d.params,
+   let params := d.params.map to_implicit,
+   df ← mk_mapp ``mvqpf.fix.rec [none,my_shape_intl_t,none,none,vec',X,fn,arg] >>= lambdas (params ++ X :: vs ++ [arg]),
+   t ← infer_type df,
+   add_decl $ mk_definition (d.induct.name <.> "rec") d.induct.u_names t df,
+   pure ()
+
 meta def mk_corecursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let u := fresh_univ d.induct.u_names,
    let t := (@const tt d.decl.to_name d.induct.u_params).mk_app d.params,
@@ -80,6 +107,7 @@ do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.fix d,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
+   trace_error $ mk_recursor func d,
    pure ()
 
 @[user_command]
@@ -92,6 +120,12 @@ do d ← inductive_decl.parse meta_info,
    pure ()
 
 end tactic
+
+universes u
+
+data list' (γ α β γ' : Type u) : Type u
+| zero : γ → list'
+| succ : γ' → α → (ℤ → β → list') → list'
 
 data nat'
 | zero : nat'
@@ -109,7 +143,6 @@ codata nat''
 #print nat''.zero
 #print nat''.succ
 
-universes u
 namespace hidden
 
 data list (α : Type u) : Type u
@@ -118,6 +151,7 @@ data list (α : Type u) : Type u
 
 #print hidden.list.internal
 #print hidden.list
+#print hidden.list.rec
 
 codata stream (α : Type u) : Type u
 | zero : stream
