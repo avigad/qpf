@@ -245,8 +245,7 @@ begin
 end
 
 instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
-{
-  P         := q.P.Wp,
+{ P         := q.P.Wp,
   abs       := λ α, quot.mk Wequiv,
   repr'     := λ α, fix_to_W,
   abs_repr' := by { intros α, apply quot.ind, intro a, apply quot.sound, apply Wrepr_equiv },
@@ -257,5 +256,13 @@ instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
       apply Wequiv.refl
     end
 }
+
+def fix.rec' {β : fix F α → Type u} (g : Π x : F (α ::: sigma β), β (fix.mk $ append_fun id sigma.fst <$$> x)) (x : fix F α) : β x :=
+let y := @fix.rec _ F _ _ α (sigma β) (λ i, ⟨_,g i⟩) x in
+have x = y.1,
+  by { symmetry, dsimp [y], apply fix.ind _ id _ x, intros x' ih,
+       rw fix.rec_eq, dsimp, simp [append_fun_id_id] at ih,
+       congr, conv { to_rhs, rw [← ih] }, rw [mv_map_map,← append_fun_comp,id_comp], },
+cast (by rw this) y.2
 
 end mvqpf

@@ -183,6 +183,8 @@ def append1 (α : typevec n) (β : Type*) : typevec (n+1)
 | (fin'.raise i) := α i
 | fin'.last      := β
 
+infixl ` ::: `:67 := append1
+
 def drop (α : typevec (n+1)) : typevec n := λ i, α i.raise
 
 def last (α : typevec (n+1)) : Type* := α fin'.last
