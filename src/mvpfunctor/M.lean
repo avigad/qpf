@@ -194,23 +194,4 @@ begin
   reflexivity
 end
 
-lemma M_mk_M_dest {α : typevec n} (x : P.M α) : M_mk P (M_dest P x) = x := sorry
--- begin
---   apply M_bisim' (λ x, true) (M_mk ∘ M_dest) _ _ _ trivial,
---   clear x,
---   intros x _,
---   cases Mxeq : M_dest x with a f',
---   have : M_dest (M_mk (M_dest x)) = ⟨a, _⟩,
---   { rw [M_mk, M_dest_corec, Mxeq, pfunctor.map_eq, pfunctor.map_eq] },
---   refine ⟨_, _, _, this, rfl, _⟩,
---   intro i,
---   exact ⟨f' i, trivial, rfl, rfl⟩
--- end
-
-lemma M_dest_M_mk {α : typevec n} (x : P.apply (α.append1 $ P.M α)) : M_dest P (M_mk P x) = x :=
-begin
-  have : M_mk P ∘ M_dest P = @_root_.id (P.M α) := funext (M_mk_M_dest P),
-  rw [M_mk, M_dest_corec, ←comp_map, ←M_mk, ← append_fun_comp, this, id_comp, append_fun_id_id, id_map]
-end
-
 end mvpfunctor
