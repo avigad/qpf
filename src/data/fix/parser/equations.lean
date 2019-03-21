@@ -50,6 +50,42 @@ do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
    add_decl $ mk_definition (d.induct.name <.> "cases_on") (u :: d.induct.u_names) rec_t df,
    pure ()
 
+open tactic.interactive (rw_rules_t rw_rule)
+open tactic.interactive.rw_rules_t
+open interactive.rw_rule
+
+meta def mk_dep_recursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   let u_params := d.induct.u_params,
+   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
+   arg ← mk_local_def `y ((@const tt d.induct.name d.induct.u_params).mk_app d.params),
+   C ← pis [arg] d.type >>= mk_local' `C binder_info.implicit,
+   X ← mk_app ``sigma [C],
+   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [X]),
+   let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app (d.params ++ [X]),
+   v_t ← mk_local_def `x my_shape_t,
+   x ← mk_local_def `x' (my_shape_intl_t vec),
+   let intl_eq := (@const tt (d.induct.name <.> "shape" <.> "internal_eq") u_params).mk_app (d.params ++ [X]),
+   x' ← mk_eq_mpr intl_eq x,
+   C' ← to_expr ``(%%C $ mvqpf.fix.mk (typevec.append_fun typevec.id sigma.fst <$$> %%x')) >>= lambdas [x],
+   let cases_on := d.induct.name <.> "shape" <.> "cases_on",
+   let cases_u : list level := level.succ d.vec_lvl :: d.induct.u_params,
+   let fs := (@const tt cases_on cases_u).mk_app $ d.params ++ [X,C',x'],
+   (vs,_) ← infer_type fs >>= mk_local_pis,
+   vs ← mzip_with (λ l (c : type_cnstr),
+     do { (args,t) ← infer_type l >>= mk_local_pis,
+          head_beta t >>= pis args >>= mk_local_def l.local_pp_name }) vs d.induct.ctors,
+   let fn := fs.mk_app vs,
+   rule ← mk_const ``mpr_mpr,
+   (t',pr,_) ← infer_type fn >>= head_beta >>= rewrite rule,
+   fn ← mk_eq_mp pr fn >>= lambdas [x],
+   let params := d.params.map to_implicit,
+   df ← mk_mapp ``mvqpf.fix.drec [none,my_shape_intl_t,none,none,vec',C,fn,arg]
+     >>= lambdas (params ++ C :: vs ++ [arg]),
+   t ← infer_type df,
+   add_decl $ mk_definition (d.induct.name <.> "drec") d.induct.u_names t df,
+   pure ()
+
 meta def mk_recursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
    let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app func.params,
@@ -108,6 +144,7 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
    trace_error $ mk_recursor func d,
+   trace_error $ mk_dep_recursor func d,
    pure ()
 
 @[user_command]
@@ -127,10 +164,14 @@ data list' (γ α β γ' : Type u) : Type u
 | zero : γ → list'
 | succ : γ' → α → (ℤ → β → list') → list'
 
+#check list'.drec
+#print list'.shape.internal.map
+
 data nat'
 | zero : nat'
 | succ : nat' → nat'
 
+#check nat'.drec
 #print nat'.zero
 #print nat'.succ
 
@@ -146,12 +187,13 @@ codata nat''
 namespace hidden
 
 data list (α : Type u) : Type u
-| zero : list
-| succ : α → list → list
+| nil : list
+| cons : α → list → list
 
 #print hidden.list.internal
 #print hidden.list
 #print hidden.list.rec
+#check @hidden.list.drec
 
 codata stream (α : Type u) : Type u
 | zero : stream
@@ -177,6 +219,12 @@ codata stream' (γ α β γ' : Type u) : Type u
 #print hidden.stream'.corec
 #print hidden.stream'.zero
 #print hidden.stream'.succ
+
+data list' (γ α β γ' : Type u) : Type u
+| zero : γ → list'
+| succ : γ' → α → (ℤ → β → list') → list'
+
+#print hidden.list'.rec
 
 -- codata stream₁ (α : Type u) : Type u
 -- | zero : stream₁

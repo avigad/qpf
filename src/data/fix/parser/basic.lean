@@ -117,7 +117,6 @@ do let n₀ := name.anonymous,
    let xs := format!"
 inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
 {format.intercalate \"\n\" brs}",
-   trace xs,
    lean.parser.with_input lean.parser.command_like xs.to_string,
    pure ()
 

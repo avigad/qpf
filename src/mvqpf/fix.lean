@@ -236,10 +236,9 @@ instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
       intros α β g x, conv { to_rhs, dsimp [mvfunctor.map]},
       rw fix.map, apply quot.sound,
       apply Wequiv.refl
-    end
-}
+    end }
 
-def fix.drec {β : fix F α → Type u} (g : Π x : F (α ::: sigma β), β (fix.mk $ append_fun id sigma.fst <$$> x)) (x : fix F α) : β x :=
+def fix.drec {β : fix F α → Type u} (g : Π x : F (α ::: sigma β), β (fix.mk $ (id ::: sigma.fst) <$$> x)) (x : fix F α) : β x :=
 let y := @fix.rec _ F _ _ α (sigma β) (λ i, ⟨_,g i⟩) x in
 have x = y.1,
   by { symmetry, dsimp [y], apply fix.ind _ id _ x, intros x' ih,

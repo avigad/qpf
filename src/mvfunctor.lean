@@ -194,6 +194,8 @@ def split_fun {α α' : typevec (n+1)}
 def append_fun {α α' : typevec n} {β β' : Type*}
   (f : α ⟹ α') (g : β → β') : append1 α β ⟹ append1 α' β' := split_fun f g
 
+infixl ` ::: ` := append_fun
+
 def drop_fun {α β : typevec (n+1)} (f : α ⟹ β) : drop α ⟹ drop β :=
 λ i, f i.raise
 
@@ -229,10 +231,10 @@ arrow.mpr (append1_drop_last _)
   last_fun (split_fun f g) = g := rfl
 
 @[simp] theorem drop_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
-  drop_fun (append_fun f g) = f := rfl
+  drop_fun (f ::: g) = f := rfl
 
 @[simp] theorem last_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
-  last_fun (append_fun f g) = g := rfl
+  last_fun (f ::: g) = g := rfl
 
 theorem split_drop_fun_last_fun {α α' : typevec (n+1)} (f : α ⟹ α') :
   split_fun (drop_fun f) (last_fun f) = f :=
@@ -250,7 +252,7 @@ def nil_fun : fin'.elim0 ⟹ fin'.elim0 :=
 -- λ i, f _
 
 theorem append_fun_inj {α α' : typevec n} {β β' : Type*} {f f' : α ⟹ α'} {g g' : β → β'} :
-  append_fun f g = append_fun f' g' →  f = f' ∧ g = g' :=
+  f ::: g = f' ::: g' →  f = f' ∧ g = g' :=
 split_fun_inj
 
 theorem split_fun_comp {α₀ α₁ α₂ : typevec (n+1)}
@@ -279,12 +281,12 @@ eq_of_drop_last_eq (λ _, rfl) rfl
 
 lemma append_fun_comp {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Type*}
     (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
-  append_fun (f₁ ⊚ f₀) (g₁ ∘ g₀) = append_fun f₁ g₁ ⊚ append_fun f₀ g₀ :=
+  f₁ ⊚ f₀ ::: g₁ ∘ g₀ = (f₁ ::: g₁) ⊚ (f₀ ::: g₀) :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
 theorem append_fun_comp_id {α : typevec n} {β₀ β₁ β₂ : Type*}
     (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
-  append_fun (@id _ α) (g₁ ∘ g₀) = append_fun id g₁ ⊚ append_fun id g₀ :=
+  @id _ α ::: g₁ ∘ g₀ = (id ::: g₁) ⊚ (id ::: g₀) :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
 -- theorem append_fun_aux {γ : typevec (n+1)} {α : typevec n} {β : Type*} (f : γ ⟹ append1 α β) :
@@ -329,7 +331,7 @@ theorem last_fun_comp {α₀ α₁ α₂ : typevec (n+1)} (f₀ : α₀ ⟹ α�
   last_fun (f₁ ⊚ f₀) = last_fun f₁ ∘ last_fun f₀ := rfl
 
 theorem append_fun_aux {α α' : typevec n} {β β' : Type*}
-  (f : α ::: β ⟹ α' ::: β') : append_fun (drop_fun f) (last_fun f) = f :=
+  (f : α ::: β ⟹ α' ::: β') : drop_fun f ::: last_fun f = f :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
 -- @[simp]
@@ -337,7 +339,7 @@ eq_of_drop_last_eq (λ _, rfl) rfl
 --   drop_fun (@to_append1_drop_last n α) = to_drop_append := rfl
 
 theorem append_fun_id_id {α : typevec n} {β : Type*} :
-  append_fun (@id n α) (@_root_.id β) = id :=
+  @id n α ::: @_root_.id β = id :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
 -- @[simp]
@@ -409,7 +411,7 @@ begin
 end
 
 def typevec_cases_cons₃ (n : ℕ) {β : Π v v' : typevec (n+1), v ⟹ v' → Sort*}
-  (f : Π t t' (f : t → t') (v v' : typevec n) (fs : v ⟹ v'), β (v ::: t) (v' ::: t') (append_fun fs f)) :
+  (f : Π t t' (f : t → t') (v v' : typevec n) (fs : v ⟹ v'), β (v ::: t) (v' ::: t') (fs ::: f)) :
   Π v v' f, β v v' f :=
 λ v v' fs,
 begin
@@ -418,7 +420,7 @@ begin
 end
 
 def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v ::: t) ⟹ (v' ::: t') → Sort*}
-  (f : Π (f : t → t') (fs : v ⟹ v'), β (append_fun fs f)) :
+  (f : Π (f : t → t') (fs : v ⟹ v'), β (fs ::: f)) :
   Π f, β f := sorry
 
 end typevec

@@ -652,3 +652,6 @@ meta def stack_trace : vm_monitor ℕ :=
        fn ← vm.curr_fn,
        vm.put_str $ (list.repeat ' ' j).as_string ++ fn.to_string,
        pure j }
+
+lemma mpr_mpr : Π {α β} (h : α = β) (h' : β = α) (x : α), h.mpr (h'.mpr x) = x
+| _ _ rfl rfl x := rfl
