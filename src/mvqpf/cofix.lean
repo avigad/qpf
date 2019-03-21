@@ -148,7 +148,15 @@ begin
 end
 
 lemma cofix.mk_dest {α : typevec n} (x : cofix F α) : cofix.mk (cofix.dest x) = x :=
-sorry
+begin 
+  apply cofix.bisim (λ x y : cofix F α, x = cofix.mk (cofix.dest y)) _ _ _ rfl, dsimp,
+  intros x y h, rw h,
+  conv { to_lhs, congr, skip, rw [cofix.mk], rw cofix.dest_corec}, 
+  rw [←comp_map, ←append_fun_comp, id_comp], 
+  rw [←comp_map, ←append_fun_comp, id_comp, ←cofix.mk],
+  congr' 2,
+  ext u, apply quot.sound, refl
+end
 
 lemma cofix.dest_mk {α : typevec n} (x : F (α.append1 $ cofix F α)) : cofix.dest (cofix.mk x) = x :=
 begin
