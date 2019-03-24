@@ -10,6 +10,7 @@ universe u
 
 namespace mvqpf
 open typevec
+open mvfunctor (liftp liftr)
 
 variables {n : ℕ} {F : typevec.{u} (n+1) → Type u} [mvfunctor F] [q : mvqpf F]
 include q
@@ -178,7 +179,7 @@ have fix.mk (abs ⟨a, q.P.append_contents f' (λ x, ⟦f x⟧)⟩) = ⟦Wrepr (
   end,
 by { rw this, apply quot.sound, apply Wrepr_equiv }
 
-theorem fix.ind {β : Type*} (g₁ g₂ : fix F α → β)
+theorem fix.ind_rec {β : Type*} (g₁ g₂ : fix F α → β)
     (h : ∀ x : F (append1 α (fix F α)),
       (append_fun id g₁) <$$> x = (append_fun id g₂) <$$> x → g₁ (fix.mk x) = g₂ (fix.mk x)) :
   ∀ x, g₁ x = g₂ x :=
@@ -201,7 +202,7 @@ theorem fix.rec_unique {β : Type*} (g : F (append1 α β) → β) (h : fix F α
   fix.rec g = h :=
 begin
   ext x,
-  apply fix.ind,
+  apply fix.ind_rec,
   intros x hyp',
   rw [hyp, ←hyp', fix.rec_eq]
 end
@@ -209,7 +210,7 @@ end
 theorem fix.mk_dest (x : fix F α) : fix.mk (fix.dest x) = x :=
 begin
   change (fix.mk ∘ fix.dest) x = x,
-  apply fix.ind,
+  apply fix.ind_rec,
   intro x, dsimp,
   rw [fix.dest, fix.rec_eq, ←comp_map, ←append_fun_comp, id_comp],
   intro h, rw h,
@@ -224,6 +225,23 @@ begin
   rw [←append_fun_comp, id_comp],
   have : fix.mk ∘ fix.dest = id, {ext x, apply fix.mk_dest },
   rw [this, append_fun_id_id]
+end
+
+theorem fix.ind {α : typevec n} (p : fix F α → Prop)
+    (h : ∀ x : F (α.append1 (fix F α)), liftp (pred_last α p) x → p (fix.mk x)) :
+  ∀ x, p x :=
+begin
+  apply quot.ind,
+  intro x,
+  apply q.P.W_ind _ x, intros a f' f ih,
+  change p ⟦q.P.W_mk a f' f⟧,
+  rw [←fix.ind_aux a f' f],
+  apply h,
+  rw mvqpf.liftp_iff,
+  refine ⟨_, _, rfl, _⟩,
+  intros i j,
+  cases i, { triv },
+  apply ih
 end
 
 instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=

@@ -19,6 +19,7 @@ structure mvpfunctor (n : ℕ) :=
 (A : Type.{u}) (B : A → typevec.{u} n)
 
 namespace mvpfunctor
+open mvfunctor (liftp liftr)
 
 variables {n m : ℕ} (P : mvpfunctor.{u} n)
 
@@ -73,6 +74,34 @@ begin
   ext; intros, refl, refl,
   congr, ext; intros; refl,
   ext, congr, rcases x_1 with ⟨a,b,c⟩; refl,
+end
+
+theorem liftp_iff {α : typevec n} (p : Π ⦃i⦄ , α i → Prop) (x : P.apply α) :
+  liftp p x ↔ ∃ a f, x = ⟨a, f⟩ ∧ ∀ i j, p (f i j) :=
+begin
+  split,
+  { rintros ⟨y, hy⟩, cases h : y with a f,
+    refine ⟨a, λ i j, (f i j).val, _, λ i j, (f i j).property⟩,
+    rw [←hy, h, map_eq], refl },
+  rintros ⟨a, f, xeq, pf⟩,
+  use ⟨a, λ i j, ⟨f i j, pf i j⟩⟩,
+  rw [xeq], reflexivity
+end
+
+theorem liftr_iff {α : typevec n} (r : Π ⦃i⦄, α i → α i → Prop) (x y : P.apply α) :
+  liftr r x y ↔ ∃ a f₀ f₁, x = ⟨a, f₀⟩ ∧ y = ⟨a, f₁⟩ ∧ ∀ i j, r (f₀ i j) (f₁ i j) :=
+begin
+  split,
+  { rintros ⟨u, xeq, yeq⟩, cases h : u with a f,
+    use [a, λ i j, (f i j).val.fst, λ i j, (f i j).val.snd],
+    split, { rw [←xeq, h], refl },
+    split, { rw [←yeq, h], refl },
+    intros i j, exact (f i j).property },
+  rintros ⟨a, f₀, f₁, xeq, yeq, h⟩,
+  use ⟨a, λ i j, ⟨(f₀ i j, f₁ i j), h i j⟩⟩,
+  dsimp, split,
+  { rw [xeq], refl },
+  rw [yeq], refl
 end
 
 end mvpfunctor

@@ -9,6 +9,28 @@ Polynomial functors. Also expresses the W-type construction as a polynomial func
 import tactic.interactive data.multiset
 universe u
 
+/- TODO (Jeremy): move this. -/
+
+namespace functor
+
+variables {F : Type u → Type u} [functor F]
+
+def liftp {α : Type u} (p : α → Prop) : F α → Prop :=
+λ x, ∃ u : F (subtype p), subtype.val <$> u = x
+
+def liftr {α : Type u} (r : α → α → Prop) : F α → F α → Prop :=
+λ x y, ∃ u : F {p : α × α // r p.fst p.snd},
+  (λ t : {p : α × α // r p.fst p.snd}, t.val.fst) <$> u = x ∧
+  (λ t : {p : α × α // r p.fst p.snd}, t.val.snd) <$> u = y
+
+def supp {α : Type u} (x : F α) : set α := { y : α | ∀ {p}, liftp p x → p y }
+
+theorem of_mem_supp {α : Type u} {x : F α} {p : α → Prop} (h : liftp p x) :
+  ∀ y ∈ supp x, p y :=
+λ y hy, hy h
+
+end functor
+
 /-
 A polynomial functor `P` is given by a type `A` and a family `B` of types over `A`. `P` maps
 any type `α` to a new type `P.apply α`.
@@ -105,6 +127,44 @@ def comp.mk (P₂ P₁ : pfunctor.{u}) {α : Type} (x : P₂.apply (P₁.apply �
 
 def comp.get (P₂ P₁ : pfunctor.{u}) {α : Type} (x : (comp P₂ P₁).apply α) : P₂.apply (P₁.apply α) :=
 ⟨ x.1.1, λ a₂, ⟨x.1.2 a₂, λ a₁, x.2 ⟨a₂,a₁⟩ ⟩ ⟩
+
+end pfunctor
+
+/-
+Lifting predicates and relations.
+-/
+
+namespace pfunctor
+variables {P : pfunctor.{u}}
+open functor
+
+theorem liftp_iff {α : Type u} (p : α → Prop) (x : P.apply α) :
+  liftp p x ↔ ∃ a f, x = ⟨a, f⟩ ∧ ∀ i, p (f i) :=
+begin
+  split,
+  { rintros ⟨y, hy⟩, cases h : y with a f,
+    refine ⟨a, λ i, (f i).val, _, λ i, (f i).property⟩,
+    rw [←hy, h, map_eq] },
+  rintros ⟨a, f, xeq, pf⟩,
+  use ⟨a, λ i, ⟨f i, pf i⟩⟩,
+  rw [xeq], reflexivity
+end
+
+theorem liftr_iff {α : Type u} (r : α → α → Prop) (x y : P.apply α) :
+  liftr r x y ↔ ∃ a f₀ f₁, x = ⟨a, f₀⟩ ∧ y = ⟨a, f₁⟩ ∧ ∀ i, r (f₀ i) (f₁ i) :=
+begin
+  split,
+  { rintros ⟨u, xeq, yeq⟩, cases h : u with a f,
+    use [a, λ i, (f i).val.fst, λ i, (f i).val.snd],
+    split, { rw [←xeq, h], refl },
+    split, { rw [←yeq, h], refl },
+    intro i, exact (f i).property },
+  rintros ⟨a, f₀, f₁, xeq, yeq, h⟩,
+  use ⟨a, λ i, ⟨(f₀ i, f₁ i), h i⟩⟩,
+  dsimp, split,
+  { rw [xeq], refl },
+  rw [yeq], refl
+end
 
 end pfunctor
 

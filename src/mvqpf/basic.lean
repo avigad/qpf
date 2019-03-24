@@ -18,27 +18,57 @@ class mvqpf {n : ℕ} (F : typevec.{u} n → Type*) [mvfunctor F] :=
 namespace mvqpf
 variables {n : ℕ} {F : typevec.{u} n → Type*} [mvfunctor F] [q : mvqpf F]
 include q
+open mvfunctor (liftp liftr)
 
 def repr {α : typevec n} (x : F α) := repr' n x
 
 theorem abs_repr {α : typevec n} (x : F α) : abs (repr x) = x :=
 abs_repr' n x
 
-attribute [simp] abs_repr
-
-/- 
-Show that every mvqpf is a lawful mvfunctor. 
+/-
+Show that every mvqpf is a lawful mvfunctor.
 -/
 
 theorem id_map {α : typevec n} (x : F α) : typevec.id <$$> x = x :=
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map], reflexivity }
 
-theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) (x : F α) : 
+theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) (x : F α) :
   (g ⊚ f) <$$> x = g <$$> f <$$> x :=
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map, ←abs_map, ←abs_map], reflexivity }
 
-instance is_lawful_mvfunctor : is_lawful_mvfunctor F :=
-{ mv_id_map := @id_map n F _ _,
-  mv_comp_map := @comp_map n F _ _ }
+instance is_lawful_mvfunctor : mvfunctor.is_lawful F :=
+{ id_map := @id_map n F _ _,
+  comp_map := @comp_map n F _ _ }
+
+/- Lifting predicates and relations -/
+
+theorem liftp_iff {α : typevec n} (p : Π ⦃i⦄, α i → Prop) (x : F α) :
+  liftp p x ↔ ∃ a f, x = abs ⟨a, f⟩ ∧ ∀ i j, p (f i j) :=
+begin
+  split,
+  { rintros ⟨y, hy⟩, cases h : repr y with a f,
+    use [a, λ i j, (f i j).val], split,
+    { rw [←hy, ←abs_repr y, h, ←abs_map], reflexivity },
+    intros i j, apply (f i j).property },
+  rintros ⟨a, f, h₀, h₁⟩, dsimp at *,
+  use abs (⟨a, λ i j, ⟨f i j, h₁ i j⟩⟩),
+  rw [←abs_map, h₀], reflexivity
+end
+
+theorem liftr_iff {α : typevec n} (r : Π ⦃i⦄, α i → α i → Prop) (x y : F α) :
+  liftr r x y ↔ ∃ a f₀ f₁, x = abs ⟨a, f₀⟩ ∧ y = abs ⟨a, f₁⟩ ∧ ∀ i j, r (f₀ i j) (f₁ i j) :=
+begin
+  split,
+  { rintros ⟨u, xeq, yeq⟩, cases h : repr u with a f,
+    use [a, λ i j, (f i j).val.fst, λ i j, (f i j).val.snd],
+    split, { rw [←xeq, ←abs_repr u, h, ←abs_map], refl },
+    split, { rw [←yeq, ←abs_repr u, h, ←abs_map], refl },
+    intros i j, exact (f i j).property },
+  rintros ⟨a, f₀, f₁, xeq, yeq, h⟩,
+  use abs ⟨a, λ i j, ⟨(f₀ i j, f₁ i j), h i j⟩⟩,
+  dsimp, split,
+  { rw [xeq, ←abs_map], refl },
+  rw [yeq, ←abs_map], refl
+end
 
 end mvqpf

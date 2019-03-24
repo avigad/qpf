@@ -43,8 +43,7 @@ class qpf (F : Type u → Type u) [functor F] :=
 namespace qpf
 variables {F : Type u → Type u} [functor F] [q : qpf F]
 include q
-
-attribute [simp] abs_repr
+open functor (liftp liftr)
 
 /-
 Show that every qpf is a lawful functor.
@@ -66,6 +65,57 @@ theorem is_lawful_functor
 { map_const_eq := h,
   id_map := @id_map F _ _,
   comp_map := @comp_map F _ _ }
+
+/-
+Lifting predicates and relations
+-/
+
+section
+open functor
+
+theorem liftp_iff {α : Type u} (p : α → Prop) (x : F α) :
+  liftp p x ↔ ∃ a f, x = abs ⟨a, f⟩ ∧ ∀ i, p (f i) :=
+begin
+  split,
+  { rintros ⟨y, hy⟩, cases h : repr y with a f,
+    use [a, λ i, (f i).val], split,
+    { rw [←hy, ←abs_repr y, h, ←abs_map], reflexivity },
+    intro i, apply (f i).property },
+  rintros ⟨a, f, h₀, h₁⟩, dsimp at *,
+  use abs (⟨a, λ i, ⟨f i, h₁ i⟩⟩),
+  rw [←abs_map, h₀], reflexivity
+end
+
+theorem liftp_iff' {α : Type u} (p : α → Prop) (x : F α) :
+  liftp p x ↔ ∃ u : q.P.apply α, abs u = x ∧ ∀ i, p (u.snd i) :=
+begin
+  split,
+  { rintros ⟨y, hy⟩, cases h : repr y with a f,
+    use ⟨a, λ i, (f i).val⟩, dsimp, split,
+    { rw [←hy, ←abs_repr y, h, ←abs_map], reflexivity },
+    intro i, apply (f i).property },
+  rintros ⟨⟨a, f⟩, h₀, h₁⟩, dsimp at *,
+  use abs (⟨a, λ i, ⟨f i, h₁ i⟩⟩),
+  rw [←abs_map, ←h₀], reflexivity
+end
+
+theorem liftr_iff {α : Type u} (r : α → α → Prop) (x y : F α) :
+  liftr r x y ↔ ∃ a f₀ f₁, x = abs ⟨a, f₀⟩ ∧ y = abs ⟨a, f₁⟩ ∧ ∀ i, r (f₀ i) (f₁ i) :=
+begin
+  split,
+  { rintros ⟨u, xeq, yeq⟩, cases h : repr u with a f,
+    use [a, λ i, (f i).val.fst, λ i, (f i).val.snd],
+    split, { rw [←xeq, ←abs_repr u, h, ←abs_map], refl },
+    split, { rw [←yeq, ←abs_repr u, h, ←abs_map], refl },
+    intro i, exact (f i).property },
+  rintros ⟨a, f₀, f₁, xeq, yeq, h⟩,
+  use abs ⟨a, λ i, ⟨(f₀ i, f₁ i), h i⟩⟩,
+  dsimp, split,
+  { rw [xeq, ←abs_map], refl },
+  rw [yeq, ←abs_map], refl
+end
+
+end
 
 /-
 Think of trees in the `W` type corresponding to `P` as representatives of elements of the
@@ -185,7 +235,7 @@ have fix.mk (abs ⟨a, λ x, ⟦f x⟧⟩) = ⟦Wrepr ⟨a, f⟩⟧,
   end,
 by { rw this, apply quot.sound, apply Wrepr_equiv }
 
-theorem fix.ind {α : Type*} (g₁ g₂ : fix F → α)
+theorem fix.ind_rec {α : Type*} (g₁ g₂ : fix F → α)
     (h : ∀ x : F (fix F), g₁ <$> x = g₂ <$> x → g₁ (fix.mk x) = g₂ (fix.mk x)) :
   ∀ x, g₁ x = g₂ x :=
 begin
@@ -204,7 +254,7 @@ theorem fix.rec_unique {α : Type*} (g : F α → α) (h : fix F → α)
   fix.rec g = h :=
 begin
   ext x,
-  apply fix.ind,
+  apply fix.ind_rec,
   intros x hyp',
   rw [hyp, ←hyp', fix.rec_eq]
 end
@@ -212,7 +262,7 @@ end
 theorem fix.mk_dest (x : fix F) : fix.mk (fix.dest x) = x :=
 begin
   change (fix.mk ∘ fix.dest) x = id x,
-  apply fix.ind,
+  apply fix.ind_rec,
   intro x, dsimp,
   rw [fix.dest, fix.rec_eq, id_map, comp_map],
   intro h, rw h
@@ -225,6 +275,21 @@ begin
   congr, ext x, apply fix.mk_dest
 end
 
+theorem fix.ind (p : fix F → Prop)
+    (h : ∀ x : F (fix F), liftp p x → p (fix.mk x)) :
+  ∀ x, p x :=
+begin
+  apply quot.ind,
+  intro x,
+  induction x with a f ih,
+  change p ⟦⟨a, f⟩⟧,
+  rw [←fix.ind_aux a f],
+  apply h,
+  rw liftp_iff,
+  refine ⟨_, _, rfl, _⟩,
+  apply ih
+end
+
 end qpf
 
 /-
@@ -234,6 +299,7 @@ Construct the final coalebra to a qpf.
 namespace qpf
 variables {F : Type u → Type u} [functor F] [q : qpf F]
 include q
+open functor (liftp liftr)
 
 /-- does recursion on `q.P.M` using `g : α → F α` rather than `g : α → P α` -/
 def corecF {α : Type*} (g : α → F α) : α → q.P.M :=
@@ -308,7 +374,7 @@ begin
   refine ⟨r', this, rxy⟩
 end
 
-theorem cofix.bisim
+theorem cofix.bisim_rel
     (r : cofix F → cofix F → Prop)
     (h : ∀ x y, r x y → quot.mk r <$> cofix.dest x = quot.mk r <$> cofix.dest y) :
   ∀ x y, r x y → x = y :=
@@ -325,6 +391,37 @@ begin
     rw h _ _ r'xy },
   right, exact rxy
 end
+
+theorem cofix.bisim
+    (r : cofix F → cofix F → Prop)
+    (h : ∀ x y, r x y → liftr r (cofix.dest x) (cofix.dest y)) :
+  ∀ x y, r x y → x = y :=
+begin
+  apply cofix.bisim_rel,
+  intros x y rxy,
+  rcases (liftr_iff r _ _).mp (h x y rxy) with ⟨a, f₀, f₁, dxeq, dyeq, h'⟩,
+  rw [dxeq, dyeq, ←abs_map, ←abs_map, pfunctor.map_eq, pfunctor.map_eq],
+  congr' 2, ext i,
+  apply quot.sound,
+  apply h'
+end
+
+theorem cofix.bisim' {α : Type*} (Q : α → Prop) (u v : α → cofix F)
+    (h : ∀ x, Q x → ∃ a f f',
+      cofix.dest (u x) = abs ⟨a, f⟩ ∧
+      cofix.dest (v x) = abs ⟨a, f'⟩ ∧
+      ∀ i, ∃ x', Q x' ∧ f i = u x' ∧ f' i = v x') :
+  ∀ x, Q x → u x = v x :=
+λ x Qx,
+let R := λ w z : cofix F, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
+cofix.bisim R
+  (λ x y ⟨x', Qx', xeq, yeq⟩,
+    begin
+      rcases h x' Qx' with ⟨a, f, f', ux'eq, vx'eq, h'⟩,
+      rw liftr_iff,
+      refine ⟨a, f, f', xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, h'⟩,
+    end)
+  _ _ ⟨x, Qx, rfl, rfl⟩
 
 end qpf
 

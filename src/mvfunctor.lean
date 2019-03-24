@@ -23,7 +23,7 @@ Also, support functions for operating with n-tuples of types, such as:
 `last_fun f`     : returns the last function of a tuple.
 
 Since e.g. `append1 α.drop α.last` is propositionally equal to `α` but not definitionally equal
-to it, we need lots of support functions and lemmas to mediate between constructions.
+to it, we need support functions and lemmas to mediate between constructions.
 -/
 import .pfunctor
 
@@ -70,28 +70,50 @@ class mvfunctor {n : ℕ} (F : typevec n → Type*) :=
 
 infixr ` <$$> `:100 := mvfunctor.map
 
-class is_lawful_mvfunctor {n : ℕ} (F : typevec n → Type*) [mvfunctor F] : Prop :=
-(mv_id_map       : Π {α : typevec n} (x : F α), typevec.id <$$> x = x)
-(mv_comp_map     : Π {α β γ : typevec n} (g : α ⟹ β) (h : β ⟹ γ) (x : F α),
+namespace mvfunctor
+
+variables {n : ℕ} {α β γ : typevec.{u} n} {F : typevec.{u} n → Type v} [mvfunctor F]
+
+def liftp {α : typevec n} (p : Π i, α i → Prop) : F α → Prop :=
+λ x, ∃ u : F (λ i, subtype (p i)), (λ i, @subtype.val _ (p i)) <$$> u = x
+
+def liftr {α : typevec n} (r : Π {i}, α i → α i → Prop) : F α → F α → Prop :=
+λ x y, ∃ u : F (λ i, {p : α i × α i // r p.fst p.snd}),
+  (λ i (t : {p : α i × α i // r p.fst p.snd}), t.val.fst) <$$> u = x ∧
+  (λ i (t : {p : α i × α i // r p.fst p.snd}), t.val.snd) <$$> u = y
+
+def supp {α : typevec n} (x : F α) (i : fin' n) : set (α i) :=
+{ y : α i | ∀ {p}, liftp p x → p i y }
+
+theorem of_mem_supp {α : typevec n} {x : F α} {p : Π ⦃i⦄, α i → Prop} (h : liftp p x) (i : fin' n):
+  ∀ y ∈ supp x i, p y :=
+λ y hy, hy h
+
+end mvfunctor
+
+namespace mvfunctor
+
+class is_lawful {n : ℕ} (F : typevec n → Type*) [mvfunctor F] : Prop :=
+(id_map       : Π {α : typevec n} (x : F α), typevec.id <$$> x = x)
+(comp_map     : Π {α β γ : typevec n} (g : α ⟹ β) (h : β ⟹ γ) (x : F α),
                     (h ⊚ g) <$$> x = h <$$> g <$$> x)
 
-export is_lawful_mvfunctor (mv_id_map mv_comp_map)
-attribute [simp] mv_id_map
+export is_lawful (id_map comp_map)
+attribute [simp] id_map
 
-section
 variables {n : ℕ} {α β γ : typevec.{u} n}
-  {F : typevec.{u} n → Type v} [mvfunctor F] [is_lawful_mvfunctor F]
+variables {F : typevec.{u} n → Type v} [mvfunctor F] [is_lawful F]
 
 @[simp]
-lemma mv_id_map' (x : F α) :
+lemma id_map' (x : F α) :
   (λ i a, a) <$$> x = x :=
-mv_id_map n x
+id_map n x
 
-lemma mv_map_map (g : α ⟹ β) (h : β ⟹ γ) (x : F α) :
+lemma map_map (g : α ⟹ β) (h : β ⟹ γ) (x : F α) :
   h <$$> g <$$> x = (h ⊚ g) <$$> x :=
-eq.symm $ mv_comp_map _ _ _
+eq.symm $ comp_map _ _ _
 
-end
+end mvfunctor
 
 namespace typevec
 
@@ -194,5 +216,18 @@ eq_of_drop_last_eq (λ _, rfl) rfl
 theorem append_fun_id_id {α : typevec n} {β : Type*} :
   append_fun (@id n α) (@_root_.id β) = id :=
 eq_of_drop_last_eq (λ _, rfl) rfl
+
+/- for lifting predicates and relations -/
+
+/-- `pred_last α p x` predicates `p` of the last element of `x : α.append1 β`. -/
+def pred_last (α : typevec n) {β : Type*} (p : β → Prop) : Π ⦃i⦄, (α.append1 β) i → Prop
+| (fin'.raise i) := λ x, true
+| fin'.last      := p
+
+/-- `rel_last α r x y` says that `p` the last elements of `x y : α.append1 β` are related by `r` and all the other elements are equal. -/
+def rel_last (α : typevec n) {β γ : Type*} (r : β → γ → Prop) :
+  Π ⦃i⦄, (α.append1 β) i → (α.append1 γ) i → Prop
+| (fin'.raise i) := eq
+| fin'.last      := r
 
 end typevec

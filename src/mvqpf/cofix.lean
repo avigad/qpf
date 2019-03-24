@@ -10,6 +10,7 @@ universe u
 
 namespace mvqpf
 open typevec
+open mvfunctor (liftp liftr)
 
 variables {n : ℕ} {F : typevec.{u} (n+1) → Type u} [mvfunctor F] [q : mvqpf F]
 include q
@@ -108,7 +109,7 @@ begin
   refine ⟨r', this, rxy⟩
 end
 
-theorem cofix.bisim {α : typevec n}
+theorem cofix.bisim_rel {α : typevec n}
     (r : cofix F α → cofix F α → Prop)
     (h : ∀ x y, r x y →
       append_fun id (quot.mk r) <$$> cofix.dest x = append_fun id (quot.mk r) <$$> cofix.dest y) :
@@ -128,6 +129,46 @@ begin
     rw h _ _ r'xy },
   right, exact rxy
 end
+
+theorem cofix.bisim {α : typevec n}
+    (r : cofix F α → cofix F α → Prop)
+    (h : ∀ x y, r x y → liftr (rel_last α r) (cofix.dest x) (cofix.dest y)) :
+  ∀ x y, r x y → x = y :=
+begin
+  apply cofix.bisim_rel,
+  intros x y rxy,
+  rcases (liftr_iff (rel_last α r) _ _).mp (h x y rxy) with ⟨a, f₀, f₁, dxeq, dyeq, h'⟩,
+  rw [dxeq, dyeq, ←abs_map, ←abs_map, mvpfunctor.map_eq, mvpfunctor.map_eq],
+  -- rw [←split_drop_fun_last_fun f₀, ←split_drop_fun_last_fun f₁],
+  rw [←q.P.append_contents_eta f₀, ←q.P.append_contents_eta f₁],
+  rw [mvpfunctor.append_fun_comp_append_contents, mvpfunctor.append_fun_comp_append_contents],
+  rw [id_comp, id_comp],
+  congr' 2, ext i j, cases i with _ i; dsimp,
+  { change f₀ _ j = f₁ _ j, apply h' _ j },
+  apply quot.sound,
+  apply h' _ j
+end
+
+theorem cofix.bisim' {α : typevec n} {β : Type*} (Q : β → Prop) (u v : β → cofix F α)
+    (h : ∀ x, Q x → ∃ a f' f₀ f₁,
+      cofix.dest (u x) = abs ⟨a, q.P.append_contents f' f₀⟩ ∧
+      cofix.dest (v x) = abs ⟨a, q.P.append_contents f' f₁⟩ ∧
+      ∀ i, ∃ x', Q x' ∧ f₀ i = u x' ∧ f₁ i = v x') :
+  ∀ x, Q x → u x = v x :=
+λ x Qx,
+let R := λ w z : cofix F α, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
+cofix.bisim R
+  (λ x y ⟨x', Qx', xeq, yeq⟩,
+    begin
+      rcases h x' Qx' with ⟨a, f', f₀, f₁, ux'eq, vx'eq, h'⟩,
+      rw liftr_iff,
+      refine ⟨a, q.P.append_contents f' f₀, q.P.append_contents f' f₁,
+        xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, _⟩,
+      intro i, cases i,
+      { intro j, apply eq.refl },
+      apply h',
+    end)
+  _ _ ⟨x, Qx, rfl, rfl⟩
 
 noncomputable instance mvqpf_cofix (α : typevec n) : mvqpf (cofix F) :=
 {
