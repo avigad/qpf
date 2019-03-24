@@ -107,3 +107,20 @@ def comp.get (P₂ P₁ : pfunctor.{u}) {α : Type} (x : (comp P₂ P₁).apply 
 ⟨ x.1.1, λ a₂, ⟨x.1.2 a₂, λ a₁, x.2 ⟨a₂,a₁⟩ ⟩ ⟩
 
 end pfunctor
+
+/-
+Facts about the general quotient needed to construct final coalgebras.
+
+TODO (Jeremy): move these somewhere.
+-/
+
+namespace quot
+
+def factor {α : Type*} (r s: α → α → Prop) (h : ∀ x y, r x y → s x y) :
+  quot r → quot s :=
+quot.lift (quot.mk s) (λ x y rxy, quot.sound (h x y rxy))
+
+def factor_mk_eq {α : Type*} (r s: α → α → Prop) (h : ∀ x y, r x y → s x y) :
+  factor r s h ∘ quot.mk _= quot.mk _ := rfl
+
+end quot

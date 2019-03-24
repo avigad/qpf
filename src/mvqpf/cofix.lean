@@ -8,21 +8,6 @@ The initial algebra of a multivariate qpf is again a qpf.
 import ..mvpfunctor.M .basic
 universe u
 
-/-
-Facts about the general quotient needed to construct final coalgebras.
--/
-
-namespace quot
-
-def factor {α : Type*} (r s: α → α → Prop) (h : ∀ x y, r x y → s x y) :
-  quot r → quot s :=
-quot.lift (quot.mk s) (λ x y rxy, quot.sound (h x y rxy))
-
-def factor_mk_eq {α : Type*} (r s: α → α → Prop) (h : ∀ x y, r x y → s x y) :
-  factor r s h ∘ quot.mk _= quot.mk _ := rfl
-
-end quot
-
 namespace mvqpf
 open typevec
 
@@ -65,7 +50,7 @@ quot.lift (λ x : q.P.M α, quot.mk Mcongr (g <$$> x))
     show r' (g <$$> a₁) (g <$$> a₂), from ⟨a₁, a₂, ra₁a₂, rfl, rfl⟩
   end
 
-instance : mvfunctor (cofix F) :=
+instance mvfunctor_cofix : mvfunctor (cofix F) :=
 { map := @cofix.map _ _ _ _}
 
 def cofix.corec {α : typevec n} {β : Type u} (g : β → F (α.append1 β)) : β → cofix F α :=
