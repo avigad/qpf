@@ -173,6 +173,23 @@ cofix.bisim R
     end)
   _ _ ⟨x, Qx, rfl, rfl⟩
 
+lemma cofix.mk_dest {α : typevec n} (x : cofix F α) : cofix.mk (cofix.dest x) = x :=
+begin
+  apply cofix.bisim_rel (λ x y : cofix F α, x = cofix.mk (cofix.dest y)) _ _ _ rfl, dsimp,
+  intros x y h, rw h,
+  conv { to_lhs, congr, skip, rw [cofix.mk], rw cofix.dest_corec},
+  rw [←comp_map, ←append_fun_comp, id_comp],
+  rw [←comp_map, ←append_fun_comp, id_comp, ←cofix.mk],
+  congr' 2,
+  ext u, apply quot.sound, refl
+end
+
+lemma cofix.dest_mk {α : typevec n} (x : F (α.append1 $ cofix F α)) : cofix.dest (cofix.mk x) = x :=
+begin
+  have : cofix.mk ∘ cofix.dest = @_root_.id (cofix F α) := funext cofix.mk_dest,
+  rw [cofix.mk, cofix.dest_corec, ←comp_map, ←cofix.mk, ← append_fun_comp, this, id_comp, append_fun_id_id, id_map]
+end
+
 noncomputable instance mvqpf_cofix (α : typevec n) : mvqpf (cofix F) :=
 { P         := q.P.Mp,
   abs       := λ α, quot.mk Mcongr,

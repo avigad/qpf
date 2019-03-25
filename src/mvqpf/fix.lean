@@ -259,9 +259,9 @@ instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
 def fix.drec {β : fix F α → Type u} (g : Π x : F (α ::: sigma β), β (fix.mk $ (id ::: sigma.fst) <$$> x)) (x : fix F α) : β x :=
 let y := @fix.rec _ F _ _ α (sigma β) (λ i, ⟨_,g i⟩) x in
 have x = y.1,
-  by { symmetry, dsimp [y], apply fix.ind _ id _ x, intros x' ih,
+  by { symmetry, dsimp [y], apply fix.ind_rec _ id _ x, intros x' ih,
        rw fix.rec_eq, dsimp, simp [append_fun_id_id] at ih,
-       congr, conv { to_rhs, rw [← ih] }, rw [mv_map_map,← append_fun_comp,id_comp], },
+       congr, conv { to_rhs, rw [← ih] }, rw [mvfunctor.map_map,← append_fun_comp,id_comp], },
 cast (by rw this) y.2
 
 end mvqpf
