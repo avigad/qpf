@@ -6,7 +6,7 @@ Author: Simon Hudon
 import for_mathlib
 
 namespace tactic
-open expr
+open expr interactive
 
 @[derive has_reflect]
 meta structure type_cnstr :=
@@ -17,10 +17,10 @@ meta structure type_cnstr :=
 meta instance : has_to_format type_cnstr :=
 { to_format := λ ⟨n,a,r⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
 
-@[derive [has_reflect,has_to_format]]
+@[derive [has_to_format]]
 meta structure inductive_type :=
-(pre : name)
 (name : name)
+(pre := name.get_prefix)
 (u_names : list _root_.name)
 (params : list expr)
 (idx : list expr)
@@ -179,25 +179,25 @@ do env ← get_env,
 
 open interactive
 
-meta def inductive_type.of_name (decl : name) : tactic inductive_type :=
-do d ← get_decl decl,
-   (idx,t) ← unpi d.type,
-   env ← get_env,
-   let (params,idx) := idx.split_at $ env.inductive_num_params decl,
-   cs ← (env.constructors_of decl).mmap $ λ c : name,
-   do { let e := @const tt c d.univ_levels,
-        t ← infer_type $ e.mk_app params,
-        (vs,t) ← unpi t,
-        pure (t.get_app_fn.const_name,{ type_cnstr .
-               name := c,
-               args := vs,
-               result := t.get_app_args.drop $ env.inductive_num_params decl }) },
-   pure { pre := decl.get_prefix,
-          name := decl,
-          u_names := d.univ_params,
-          params := params,
-          idx := idx, type := t,
-          ctors := cs.map prod.snd }
+-- meta def inductive_type.of_name (decl : name) : tactic inductive_type :=
+-- do d ← get_decl decl,
+--    (idx,t) ← unpi d.type,
+--    env ← get_env,
+--    let (params,idx) := idx.split_at $ env.inductive_num_params decl,
+--    cs ← (env.constructors_of decl).mmap $ λ c : name,
+--    do { let e := @const tt c d.univ_levels,
+--         t ← infer_type $ e.mk_app params,
+--         (vs,t) ← unpi t,
+--         pure (t.get_app_fn.const_name,{ type_cnstr .
+--                name := c,
+--                args := vs,
+--                result := t.get_app_args.drop $ env.inductive_num_params decl }) },
+--    pure { pre := decl.get_prefix,
+--           name := decl,
+--           u_names := d.univ_params,
+--           params := params,
+--           idx := idx, type := t,
+--           ctors := cs.map prod.snd }
 
 meta def inductive_type.of_decl (decl : inductive_decl) : tactic inductive_type :=
 do d ← decl.decls.nth 0,
@@ -216,5 +216,21 @@ do d ← decl.decls.nth 0,
           params := decl.params,
           idx := idx, type := t,
           ctors := cs.map prod.snd }
+
+meta def inductive_type.to_decl (decl : inductive_type) : inductive_decl :=
+let p := decl.pre,
+    a := name.anonymous,
+      -- (decl.name.replace_prefix p a)
+    t := @const tt decl.name decl.u_params,
+    d : single_inductive_decl :=
+       { attrs := undefined,
+         sig := local_const decl.name (decl.name.replace_prefix p a) binder_info.default decl.type,
+         intros := decl.ctors.map $ λ c,
+           let c_name := c.name in
+           -- let c_name := c.name.replace_prefix p a in
+           local_const c_name c_name binder_info.default $ expr.pis (c.args) (t.mk_app $ decl.params ++ c.result) }
+in { u_names := decl.u_names,
+     params := decl.params,
+     decls := [d] }
 
 end tactic

@@ -264,4 +264,12 @@ have x = y.1,
        congr, conv { to_rhs, rw [← ih] }, rw [mv_map_map,← append_fun_comp,id_comp], },
 cast (by rw this) y.2
 
+-- section drec
+-- variables  {F' : typevec.{max u v} (n+1) → Type.{max u v}} [mvfunctor F'] [mvqpf F'] {β : fix F α → Type v} {map : Π {α β}, α ⟹ β → F' α → F β}
+
+-- def up (x : fix F α) : fix F' (typevec.lift.{v} α) :=
+-- fix.rec _ x
+
+-- def fix.drec' (g : Π x : F' (typevec.lift.{v} α ::: sigma β), β (fix.mk $ map (lift.down _ ::: sigma.fst) x)) (x : fix F α) : β x := _
+
 end mvqpf

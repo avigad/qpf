@@ -445,6 +445,15 @@ def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v
   (f : Π (f : t → t') (fs : v ⟹ v'), β (fs ::: f)) :
   Π f, β f := sorry
 
+def lift {n} (α : typevec.{v} n) : typevec.{max u v} n
+| i := ulift.{u} (α i)
+
+def lift.up {n} (α : typevec.{v} n) : α ⟹ lift α
+| v i := ulift.up.{u} i
+
+def lift.down {n} (α : typevec.{v} n) : lift α ⟹ α
+| v i := ulift.down.{u} i
+
 /- for lifting predicates and relations -/
 
 /-- `pred_last α p x` predicates `p` of the last element of `x : α.append1 β`. -/

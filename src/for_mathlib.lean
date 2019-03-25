@@ -432,7 +432,7 @@ meta def unify_app (e : expr) (args : list expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    unify_app_aux e t args
 
-meta def mk_to_string (t : expr) (fn of_string : name) (ls : list expr) (out : expr) : tactic expr :=
+meta def mk_to_string (t : expr) (fn of_string : name) (ls : list expr) (out : expr) (trust : bool) : tactic expr :=
 do let n := t.get_app_fn.const_name,
    d ← get_decl n,
    let r : reducibility_hints := reducibility_hints.regular 1 tt,
@@ -465,19 +465,19 @@ do let n := t.get_app_fn.const_name,
           pure () end },
    df ← instantiate_mvars df >>= lambdas ls,
    t ← infer_type df,
-   add_decl' $ declaration.defn (n ++ fn) d.univ_params t df r d.is_trusted
+   add_decl' $ declaration.defn (n ++ fn) d.univ_params t df r (d.is_trusted ∧ trust)
 
 meta def mk_has_to_format : tactic unit :=
 do `(has_to_format %%t) ← target,
    ls ← local_context,
-   e ← mk_to_string t `to_fmt `format.of_string ls `(format),
+   e ← mk_to_string t `to_fmt `format.of_string ls `(format) ff,
    refine ``( { to_format := %%(e.mk_app ls) } ),
    pure ()
 
 meta def mk_has_repr : tactic unit :=
 do `(has_repr %%t) ← target,
    ls ← local_context,
-   e ← mk_to_string t `repr `id ls `(string),
+   e ← mk_to_string t `repr `id ls `(string) tt,
    refine ``( { repr := %%(e.mk_app ls) } ),
    pure ()
 
@@ -655,3 +655,6 @@ meta def stack_trace : vm_monitor ℕ :=
 
 lemma mpr_mpr : Π {α β} (h : α = β) (h' : β = α) (x : α), h.mpr (h'.mpr x) = x
 | _ _ rfl rfl x := rfl
+
+instance {α β} (f : β → α) (r : α → α → Prop) [g : decidable_rel r] : decidable_rel (inv_image r f)
+| x y := g _ _

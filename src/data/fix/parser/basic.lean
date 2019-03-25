@@ -71,6 +71,7 @@ do let n := induct.name,
 
 meta instance : has_repr expr := ⟨ to_string ⟩
 meta instance task.has_repr {α} [has_repr α] : has_repr (task α) := ⟨ repr ∘ task.get ⟩
+meta instance task.has_to_format {α} [has_to_format α] : has_to_format (task α) := ⟨ to_fmt ∘ task.get ⟩
 
 open level
 meta def level.repr : level → ℕ → string
@@ -87,9 +88,9 @@ meta instance level.has_repr : has_repr level := ⟨ λ l, level.repr l 0 ⟩
 -- | x := _
 
 -- attribute [derive has_reflect] reducibility_hints declaration
-attribute [derive has_repr] reducibility_hints declaration type_cnstr inductive_type
+attribute [derive has_to_format] reducibility_hints declaration
 
-@[derive has_repr]
+@[derive has_to_format]
 meta structure internal_mvfunctor :=
 (decl : declaration)
 (induct : inductive_type)
@@ -101,8 +102,7 @@ meta structure internal_mvfunctor :=
 (params : list expr)
 (type : expr)
 
--- @[replaceable]
-meta def mk_inductive' : inductive_type → lean.parser unit
+meta def format_inductive : inductive_type → tactic format
 | decl :=
 do let n₀ := name.anonymous,
    t ← pis decl.idx decl.type,
@@ -117,6 +117,13 @@ do let n₀ := name.anonymous,
    let xs := format!"
 inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
 {format.intercalate \"\n\" brs}",
+   pure xs
+-- @[replaceable]
+
+meta def mk_inductive' : inductive_type → lean.parser unit
+| decl :=
+do xs ← format_inductive decl,
+   trace xs,
    lean.parser.with_input lean.parser.command_like xs.to_string,
    pure ()
 
