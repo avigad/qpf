@@ -5,7 +5,7 @@ Author: Jeremy Avigad, Mario Carneiro
 
 The M construction as a multivariate polynomial functor.
 -/
-import mvpfunctor.basic .W ..M
+import mvpfunctor.basic pfunctor
 universe u
 
 namespace mvpfunctor

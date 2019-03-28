@@ -22,7 +22,7 @@ The main goal is to construct:
 We also show that the composition of qpfs is a qpf, and that the quotient of a qpf
 is a qpf.
 -/
-import tactic.interactive data.multiset M
+import tactic.interactive data.multiset pfunctor
 universe u
 
 /-

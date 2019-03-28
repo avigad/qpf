@@ -13,17 +13,6 @@ open typevec
 
 variables {n : ℕ} (P : mvpfunctor.{u} (n+1))
 
-def drop : mvpfunctor n :=
-{ A := P.A, B := λ a, (P.B a).drop }
-
-def last : pfunctor :=
-{ A := P.A, B := λ a, (P.B a).last }
-
-@[reducible] def append_contents {α : typevec n} {β : Type*}
-    {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.B a ⟹ α.append1 β :=
-split_fun f' f
-
 /- defines a typevec of labels to assign to each node of P.last.W -/
 inductive W_path : P.last.W → fin' n → Type u
 | root (a : P.A) (f : P.last.B a → P.last.W) (i : fin' n) (c : P.drop.B a i) :

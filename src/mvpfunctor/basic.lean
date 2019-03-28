@@ -7,7 +7,7 @@ Multivariate polynomial functors.
 
 Note: eventually the W and M constructions as multivariate polynomial functors will go here.
 -/
-import ..mvfunctor
+import ..mvfunctor ..pfunctor
 import for_mathlib
 universes u v
 
@@ -107,5 +107,26 @@ begin
   { rw [xeq], refl },
   rw [yeq], refl
 end
+
+end mvpfunctor
+
+/-
+Decomposing an n+1-ary pfunctor.
+-/
+
+namespace mvpfunctor
+open typevec
+variables {n : ℕ} (P : mvpfunctor.{u} (n+1))
+
+def drop : mvpfunctor n :=
+{ A := P.A, B := λ a, (P.B a).drop }
+
+def last : pfunctor :=
+{ A := P.A, B := λ a, (P.B a).last }
+
+@[reducible] def append_contents {α : typevec n} {β : Type*}
+    {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
+  P.B a ⟹ α.append1 β :=
+split_fun f' f
 
 end mvpfunctor
