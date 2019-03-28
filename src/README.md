@@ -5,7 +5,7 @@ Contents
 
 - `pfunctor/` : polynomial functors, including M and W types
 
-- `qpf.lean` : quotients of unary polynomial functors, initial algebras, final coalgebras, and closure under quotients and composition. This is subsumed by the multivariate versions later on, which do not depend on the unary version. But we will keep the unary ones around for reference.
+- `qpf.lean` : quotients of unary polynomial functors, initial algebras, final coalgebras, and closure under quotients and composition. This is subsumed by the multivariate versions, which do not depend on the unary versions, though the latter are instructive.
 
 - `mvfunctor/` : multivariate functors
 
