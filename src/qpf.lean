@@ -235,7 +235,7 @@ have fix.mk (abs ⟨a, λ x, ⟦f x⟧⟩) = ⟦Wrepr ⟨a, f⟩⟧,
   end,
 by { rw this, apply quot.sound, apply Wrepr_equiv }
 
-theorem fix.ind_rec {α : Type*} (g₁ g₂ : fix F → α)
+theorem fix.ind_rec {α : Type u} (g₁ g₂ : fix F → α)
     (h : ∀ x : F (fix F), g₁ <$> x = g₂ <$> x → g₁ (fix.mk x) = g₂ (fix.mk x)) :
   ∀ x, g₁ x = g₂ x :=
 begin
@@ -249,7 +249,7 @@ begin
   congr, ext x, apply ih
 end
 
-theorem fix.rec_unique {α : Type*} (g : F α → α) (h : fix F → α)
+theorem fix.rec_unique {α : Type u} (g : F α → α) (h : fix F → α)
     (hyp : ∀ x, h (fix.mk x) = g (h <$> x)) :
   fix.rec g = h :=
 begin
