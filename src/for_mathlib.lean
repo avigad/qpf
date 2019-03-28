@@ -40,14 +40,25 @@ def zip_with₃ {α β γ φ} (f : α → β → γ → φ) : list α → list �
 | (x::xs) (y::ys) (z::zs) := f x y z :: zip_with₃ xs ys zs
 | _ _ _ := []
 
-def mzip_with₃ {m : Type u → Type v} [applicative m] {α β γ φ} (f : α → β → γ → m φ) : list α → list β → list γ → m (list φ)
+variables {m : Type u → Type v} [applicative m]
+
+def mzip_with₃ {α β γ φ} (f : α → β → γ → m φ) : list α → list β → list γ → m (list φ)
 | (x::xs) (y::ys) (z::zs) := (::) <$> f x y z <*> mzip_with₃ xs ys zs
 | _ _ _ := pure []
 
-def mzip_with₄ {m : Type u → Type v} [applicative m] {α β γ φ ψ} (f : α → β → γ → φ → m ψ) :
+def mzip_with₄ {α β γ φ ψ} (f : α → β → γ → φ → m ψ) :
   list α → list β → list γ → list φ → m (list ψ)
 | (w :: ws) (x::xs) (y::ys) (z::zs) := (::) <$> f w x y z <*> mzip_with₄ ws xs ys zs
 | _ _ _ _ := pure []
+
+-- def mmap_enum_if' {α} (p : α → Prop) [decidable_pred p] (f : ℕ → α → m α) : ℕ → list α → m (list α)
+-- | n [] := pure []
+-- | n (x :: xs) :=
+--   if p x then (::) <$> f n x <*> mmap_enum_if' (n+1) xs
+--          else cons x <$> mmap_enum_if' n xs
+
+-- def mmap_enum_if {α} (p : α → Prop) [decidable_pred p] (f : ℕ → α → m α) : list α → m (list α) :=
+-- mmap_enum_if' p f 0
 
 end list
 namespace roption
@@ -318,6 +329,12 @@ do t ← infer_type e >>= pp,
    trace format!"{e'} : {t}",
    pure e
 
+open declaration (defn)
+meta def trace_def (n : name) : tactic unit :=
+do (defn n _ t df _ _) ← get_decl n,
+   t ← pp t, df ← pp df,
+   trace format!"\ndef {n} : {t} :=\n{df}\n"
+
 meta def trace_error {α} (tac : tactic α) : tactic α :=
 λ s, match tac s with
      | r@(result.success _ _) := r
@@ -431,6 +448,27 @@ do t ← infer_type a,
 meta def unify_app (e : expr) (args : list expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    unify_app_aux e t args
+
+meta def unify_mapp_aux : expr → expr → list (option expr) → tactic expr
+| e (pi _ _ d b) (none :: as) :=
+do a ← mk_mvar,
+   t ← infer_type a,
+   unify t d,
+   e' ← head_beta (e a),
+   b' ← whnf (b.instantiate_var a),
+   unify_mapp_aux e' b' as
+| e (pi _ _ d b) (some a :: as) :=
+do t ← infer_type a,
+   unify t d,
+   e' ← head_beta (e a),
+   b' ← whnf (b.instantiate_var a),
+   unify_mapp_aux e' b' as
+| e t (_ :: _) := fail "too many arguments"
+| e _ [] := pure e
+
+meta def unify_mapp (e : expr) (args : list (option expr)) : tactic expr :=
+do t ← infer_type e >>= whnf,
+   unify_mapp_aux e t args
 
 meta def mk_to_string (t : expr) (fn of_string : name) (ls : list expr) (out : expr) : tactic expr :=
 do let n := t.get_app_fn.const_name,

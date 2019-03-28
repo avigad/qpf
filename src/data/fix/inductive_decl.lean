@@ -43,7 +43,7 @@ meta def inductive_type.is_constructor (decl : inductive_type) (n : name) : bool
 n ∈ decl.ctors.map type_cnstr.name
 
 meta def fresh_univ (xs : list name) (n : name := `u) : name :=
-(((list.iota (xs.length + 1)).map n.append_after).diff xs).head
+(((list.iota (xs.length + 1)).reverse.map n.append_after).diff xs).head
 
 meta def mk_cases_on (decl : inductive_type) : tactic unit :=
 do let u := fresh_univ decl.u_names,

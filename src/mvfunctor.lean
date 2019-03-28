@@ -295,9 +295,8 @@ def typevec_cases_cons (n : ℕ) {β : typevec (n+1) → Sort*} (f : Π t (v : t
 
 open typevec
 
-def map0 : fin'.elim0 ⟹ fin'.elim0 | i := fin'.elim0 i
 
-def typevec_cases_nil₃ {β : Π v v' : typevec 0, v ⟹ v' → Sort*} (f : β fin'.elim0 fin'.elim0 map0) :
+def typevec_cases_nil₃ {β : Π v v' : typevec 0, v ⟹ v' → Sort*} (f : β fin'.elim0 fin'.elim0 nil_fun) :
   Π v v' f, β v v' f :=
 λ v v' fs,
 begin
@@ -314,6 +313,10 @@ begin
   rw [←split_drop_fun_last_fun fs],
   apply F
 end
+
+def typevec_cases_nil₂ {β : fin'.elim0 ⟹ fin'.elim0 → Sort*}
+  (f : β nil_fun) :
+  Π f, β f := sorry
 
 def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v ::: t) ⟹ (v' ::: t') → Sort*}
   (F : Π (f : t → t') (fs : v ⟹ v'), β (fs ::: f)) :

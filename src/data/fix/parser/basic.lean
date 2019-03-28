@@ -511,52 +511,101 @@ meta def saturate (e : expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    saturate' t e
 
-meta def destruct_multimap : expr → tactic unit
-| e :=
-do `(%%t ⟹ _) ← infer_type e,
-   `(typevec %%n) ← infer_type t,
-    if ¬ n.is_napp_of ``has_zero.zero 1
-      then do
-        refine ``(typevec_cases_cons₂ %%n _ _ _ _ _ %%e),
-        f ← intro `f, e' ← intro1,
-        destruct_multimap e'
-      else pure ()
+open nat expr
+
+meta def mk_motive : tactic expr :=
+do (pi en bi d b) ← target,
+   pure $ lam en bi d b
+
+meta def destruct_multimap' : ℕ → expr → expr → list expr → tactic (list expr)
+| 0 v₀ v₁ xs :=
+do C ← mk_motive,
+   refine ``(@typevec_cases_nil₂ %%C _),
+   pure xs
+| (succ n) v₀ v₁ xs :=
+do C ← mk_motive,
+   a ← mk_mvar, b ← mk_mvar,
+   to_expr ``(append1 %%a %%b) tt ff >>= unify v₀,
+   `(append1 %%a' %%b') ← pure v₁,
+   refine ``(@typevec_cases_cons₂ _ %%b %%b' %%a %%a' %%C _),
+   f ← intro `f,
+   destruct_multimap' n a a' (f :: xs)
+
+meta def destruct_multimap (e : expr) : tactic (list expr) :=
+do `(%%v₀ ⟹ %%v₁) ← infer_type e,
+   `(typevec %%n) ← infer_type v₀,
+   n ← eval_expr ℕ n,
+   n_h ← revert e,
+   destruct_multimap' n v₀ v₁ [] <*
+     intron (n_h-1)
+
+lemma santas_helper {n} {P : mvpfunctor n} {α} (C : P.apply α → Sort*) {a : P.A} {b} (b')
+  (x : C ⟨a,b⟩) (h : b = b') : C ⟨a,b'⟩ :=
+by cases h; exact x
+
+open list
+
+section zip_vars
+variables (n : name) (univs : list level)
+  (args : list expr) (shape_args : list expr)
+
+meta def mk_child_arg (e : expr) : list (expr × expr × ℕ) → list (expr × expr × ℕ) × list expr × expr
+| [] := ([],shape_args.tail,shape_args.head)
+| (⟨v,e',i⟩::vs) :=
+if v.occurs e
+  then let c : expr := const ( (n.update_prefix $ n.get_prefix ++ v.local_pp_name).append_after i ) univs
+       in ( ⟨v,e',i+1⟩::vs, shape_args, e' $ c.mk_app args)
+  else prod.map (cons ⟨v,e',i⟩) id $ mk_child_arg vs
+
+meta def zip_vars' : list expr → list (expr × expr × ℕ) → list expr → list expr
+| _ xs [] := []
+| shape_args xs (v :: vs) :=
+let (xs',shape_args',v') := mk_child_arg n univs args shape_args v xs in
+v' :: zip_vars' shape_args xs' vs
+
+meta def zip_vars (ls : list (expr × expr)) : list expr → list expr :=
+zip_vars' n univs args shape_args $ ls.map $ λ x, (x.1,x.2,0)
+
+end zip_vars
 
 meta def mk_pfunc_recursor (func : internal_mvfunctor) : tactic unit :=
 do let u := fresh_univ func.induct.u_names,
    v ← mk_live_vec func.vec_lvl $ func.live_params.map prod.fst,
    fn ← mk_app `mvpfunctor.apply [functor_expr func,v],
    C ← mk_local' `C binder_info.implicit (expr.imp fn $ expr.sort $ level.param u),
+   let dead_params := func.dead_params.map prod.fst,
    cases_t ← func.induct.ctors.mmap $ λ c,
    do { let n := c.name.update_prefix (func.decl.to_name <.> "mvpfunctor"),
         let e := (@expr.const tt n func.induct.u_params).mk_app (func.params ++ c.args),
-        pis c.args (C e) >>= mk_local_def `v },
+        prod.mk c <$> (pis c.args (C e) >>= mk_local_def `v) },
    n ← mk_local_def `n fn,
    (_,df) ← solve_aux (expr.pis [n] $ C n) $ do
-     { n ← intro1, [(_, [x,y], _)] ← cases_core n,
-       cases x, gs ← get_goals, -- case distinction of n_snd as a vector
-       gs ← mzip_with (λ h g,
-         do { set_goals [g],
-              admit,
-              -- h ← note `h none h >>= saturate,
-              -- n_snd ← get_local `n_snd,
-              -- trace "+",
-              -- `[dsimp [list_F''.pfunctor]],
-              -- destruct_multimap n_snd,
-              -- refine ``(typevec_cases_cons₂ 0 _ _ _ _ _ %%n_snd),
-              -- to_expr ``(foo %%C _ (%%h )) >>= apply,
-
-              get_goals }) cases_t gs,
+     { n ← intro1, [(_, [n_fst,n_snd], _)] ← cases_core n,
+       hs ← cases_core n_fst,
+       gs ← get_goals,
+       gs ← list.mzip_with₃ (λ h g v,
+         do { let ⟨c,h⟩ := (h : type_cnstr × expr),
+              set_goals [g],
+              ⟨n,xs,[(_,n_snd)]⟩ ← pure (v : name × list expr × list (name × expr)),
+              fs ← destruct_multimap n_snd,
+              n_snd ← mk_map_vec func.vec_lvl fs,
+              let child_n := c.name.update_prefix $ c.name.get_prefix <.> "child_t",
+              let subst := (func.live_params.map prod.fst).zip fs,
+              let h_args := zip_vars child_n func.induct.u_params (dead_params ++ xs) xs subst c.args,
+              let h := h.mk_app h_args,
+              let n_fst := (@const tt n func.induct.u_params).mk_app $ func.dead_params.map prod.fst ++ xs,
+              vec ← mk_live_vec func.vec_lvl $ func.live_params.map prod.fst,
+              fn ← mk_const ``santas_helper,
+              unify_mapp fn [none,none,vec,C,none,none,n_snd,h,none] >>= refine ∘ to_pexpr,
+              congr; ext [rcases_patt.many [[rcases_patt.one `_]]] none; reflexivity,
+              get_goals }) cases_t gs hs,
        set_goals gs.join,
-       -- trace_state,
        pure () },
-   let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t,
+   let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t.map prod.snd,
    df ← instantiate_mvars df >>= lambdas vs,
    t ← pis (vs ++ [n]) (C n),
    add_decl $ declaration.thm (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t (pure df),
    pure ()
-
--- #print internal_mvfunctor
 
 meta def mk_qpf_abs (func : internal_mvfunctor) : tactic unit :=
 do let n := func.live_params.length,
@@ -625,13 +674,13 @@ open interactive lean.parser lean
 meta def qpf_decl (meta_info : decl_meta_info) (_ : parse (tk "qpf")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
    func ← mk_internal_functor' d,
-   mk_mvfunctor_instance func,
+   trace_error $ mk_mvfunctor_instance func,
    mk_pfunctor func,
-   mk_pfunc_constr func,
-   mk_pfunc_recursor func,
+   trace_error $ mk_pfunc_constr func,
+   trace_error $ mk_pfunc_recursor func,
    -- mk_pfunc_map func,
    -- mk_pfunc_mvfunctor_instance func,
-   mk_mvqpf_instance func,
+   trace_error $ mk_mvqpf_instance func,
    pure ()
 
 -- local attribute [user_command]  qpf_decl
@@ -642,8 +691,16 @@ namespace hidden
 
 universes u_1 u_2 u_3
 
--- set_option trace.app_builder true
+set_option trace.app_builder true
 -- set_option pp.universes true
+
+qpf list_F' (α β : Type)
+-- | nil : list_F
+| cons : ℤ → α → β → list_F'
+
+-- qpf list_F'' (α β : Type)
+-- -- | nil : list_F
+-- | cons : ℤ → (ℕ → α) → (list ℕ → α) → (ℤ → β) → list_F''
 
 -- @[derive mvqpf]
 qpf list_F (α : Type)
