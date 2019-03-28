@@ -76,6 +76,10 @@ begin
   ext, congr, rcases x_1 with ⟨a,b,c⟩; refl,
 end
 
+/-
+lifting predicates and relations
+-/
+
 theorem liftp_iff {α : typevec n} (p : Π ⦃i⦄ , α i → Prop) (x : P.apply α) :
   liftp p x ↔ ∃ a f, x = ⟨a, f⟩ ∧ ∀ i j, p (f i j) :=
 begin

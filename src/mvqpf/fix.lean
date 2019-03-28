@@ -17,12 +17,12 @@ include q
 
 /-- does recursion on `q.P.W` using `g : F α → α` rather than `g : P α → α` -/
 def recF {α : typevec n} {β : Type*} (g : F (α.append1 β) → β) : q.P.W α → β :=
-q.P.W_rec (λ a f' f rec, g (abs ⟨a, mvpfunctor.append_contents _ f' rec⟩))
+q.P.W_rec (λ a f' f rec, g (abs ⟨a, split_fun f' rec⟩))
 
 theorem recF_eq {α : typevec n} {β : Type*} (g : F (α.append1 β) → β)
     (a : q.P.A) (f' : q.P.drop.B a ⟹ α) (f : q.P.last.B a → q.P.W α) :
-  recF g (q.P.W_mk a f' f) =  g (abs ⟨a, mvpfunctor.append_contents _ f' (recF g ∘ f)⟩) :=
-by rw [recF, mvpfunctor.W_rec_eq]
+  recF g (q.P.W_mk a f' f) =  g (abs ⟨a, split_fun f' (recF g ∘ f)⟩) :=
+by rw [recF, mvpfunctor.W_rec_eq]; refl
 
 theorem recF_eq' {α : typevec n} {β : Type*} (g : F (α.append1 β) → β)
     (x : q.P.W α) :
@@ -30,7 +30,7 @@ theorem recF_eq' {α : typevec n} {β : Type*} (g : F (α.append1 β) → β)
 begin
   apply q.P.W_cases _ x,
   intros a f' f,
-  rw [recF_eq, q.P.W_dest'_W_mk, mvpfunctor.map_eq, mvpfunctor.append_fun_comp_append_contents,
+  rw [recF_eq, q.P.W_dest'_W_mk, mvpfunctor.map_eq, append_fun_comp_split_fun,
     typevec.id_comp]
 end
 
@@ -92,7 +92,7 @@ theorem Wrepr_W_mk  {α : typevec n}
     (a : q.P.A) (f' : q.P.drop.B a ⟹ α) (f : q.P.last.B a → q.P.W α) :
   Wrepr (q.P.W_mk a f' f) =
     q.P.W_mk' (repr (abs ((append_fun id Wrepr) <$$> ⟨a, q.P.append_contents f' f⟩))) :=
-by rw [Wrepr, recF_eq', q.P.W_dest'_W_mk]
+by rw [Wrepr, recF_eq', q.P.W_dest'_W_mk]; refl
 
 theorem Wrepr_equiv {α : typevec n} (x : q.P.W α) : Wequiv (Wrepr x) x :=
 begin
@@ -100,8 +100,7 @@ begin
   apply Wequiv.trans _ (q.P.W_mk' ((append_fun id Wrepr) <$$> ⟨a, q.P.append_contents f' f⟩)),
   { apply Wequiv.abs',
     rw [Wrepr_W_mk, q.P.W_dest'_W_mk', q.P.W_dest'_W_mk', abs_repr] },
-  rw [q.P.map_eq, mvpfunctor.W_mk', q.P.append_fun_comp_append_contents, id_comp,
-      q.P.contents_dest_left_append_contents, q.P.contents_dest_right_append_contents],
+  rw [q.P.map_eq, mvpfunctor.W_mk', append_fun_comp_split_fun, id_comp],
   apply Wequiv.ind, exact ih
 end
 

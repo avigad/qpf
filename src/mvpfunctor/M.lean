@@ -67,8 +67,8 @@ def M_corec {α : typevec n} {β : Type u} (g : β → P.apply (α.append1 β)) 
   β → P.M α :=
 M_corec' P
   (λ b, (g b).fst)
-  (λ b, P.contents_dest_left (g b).snd)
-  (λ b, P.contents_dest_right (g b).snd)
+  (λ b, drop_fun (g b).snd)
+  (λ b, last_fun (g b).snd)
 
 def M_path_dest_left {α : typevec n} {x : P.last.M}
     {a : P.A} {f : P.last.B a → P.last.M} (h : pfunctor.M_dest x = ⟨a, f⟩)
@@ -86,7 +86,7 @@ def M_dest' {α : typevec n} {x : P.last.M}
     {a : P.A} {f : P.last.B a → P.last.M} (h : pfunctor.M_dest x = ⟨a, f⟩)
     (f' : P.M_path x ⟹ α) :
   P.apply (α.append1 (P.M α)) :=
-⟨a, append_contents _ (P.M_path_dest_left h f') (λ x, ⟨f x, P.M_path_dest_right h f' x⟩)⟩
+⟨a, split_fun (P.M_path_dest_left h f') (λ x, ⟨f x, P.M_path_dest_right h f' x⟩)⟩
 
 def M_dest {α : typevec n} (x : P.M α) : P.apply (α.append1 (P.M α)) :=
 P.M_dest' (sigma.eta $ pfunctor.M_dest x.fst).symm x.snd
@@ -111,7 +111,7 @@ theorem M_dest_corec' {α : typevec.{u} n} {β : Type u}
     (g₂ : Π b : β, P.last.B (g₀ b) → β)
     (x : β) :
   P.M_dest (P.M_corec' g₀ g₁ g₂ x) =
-    ⟨g₀ x, P.append_contents (g₁ x) (P.M_corec' g₀ g₁ g₂ ∘ (g₂ x))⟩ :=
+    ⟨g₀ x, split_fun (g₁ x) (P.M_corec' g₀ g₁ g₂ ∘ (g₂ x))⟩ :=
 rfl
 
 theorem M_dest_corec {α : typevec n} {β : Type u} (g : β → P.apply (α.append1 β)) (x : β) :
@@ -120,7 +120,7 @@ begin
   transitivity, apply M_dest_corec',
   cases g x with a f, dsimp,
   rw mvpfunctor.map_eq, congr,
-  conv { to_rhs, rw [←P.append_contents_eta f, append_fun_comp_append_contents] },
+  conv { to_rhs, rw [←split_drop_fun_last_fun f, append_fun_comp_split_fun] },
   refl
 end
 
@@ -171,26 +171,12 @@ begin
   { exact IH _ _ (h'' _) }
 end
 
--- theorem M_bisim' {β : typevec n} {α : Type*} (Q : α → Prop) (u v : α → M P β)
---     (h : ∀ x, Q x → ∃ a f f',
---       M_dest P (u x) = ⟨a, f⟩ ∧
---       M_dest P (v x) = ⟨a, f'⟩ ∧
---       ∀ i, ∃ x', Q x' ∧ f ⊚ _ = append_fun id u ∧ f' = _) :
---   ∀ x, Q x → u x = v x :=
--- λ x Qx,
--- let R := λ w z : M P β, ∃ x', Q x' ∧ w = u x' ∧ z = v x' in
--- @M_bisim n P β R
---   (λ x y ⟨x', Qx', xeq, yeq⟩,
---     let ⟨a, f, f', ux'eq, vx'eq, h'⟩ := h x' Qx' in
---       ⟨a, f, f', xeq.symm ▸ ux'eq, yeq.symm ▸ vx'eq, h'⟩)
---   _ _ ⟨x, Qx, rfl, rfl⟩
-
 theorem M_dest_map {α β : typevec n} (g : α ⟹ β) (x : P.M α) :
   P.M_dest (g <$$> x) = append_fun g (λ x, g <$$> x) <$$> P.M_dest x :=
 begin
   cases x with a f,
   rw map_eq,
-  conv { to_rhs, rw [M_dest, M_dest', map_eq, append_fun_comp_append_contents] },
+  conv { to_rhs, rw [M_dest, M_dest', map_eq, append_fun_comp_split_fun] },
   reflexivity
 end
 

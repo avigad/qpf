@@ -5,7 +5,8 @@ import data.fix.equations
 
 universes u
 
-lemma foo {n} {p : mvpfunctor n} {v} (C : p.apply v → Sort*) {a : p.A} {f g : p.B a ⟹ v} (h : f = g) (x : C ⟨a,f⟩) : C ⟨a,g⟩ := sorry
+lemma foo {n} {p : mvpfunctor n} {v} (C : p.apply v → Sort*) {a : p.A} {f g : p.B a ⟹ v} (h : f = g) (x : C ⟨a,f⟩) : C ⟨a,g⟩ :=
+by cases h; apply x
 
 namespace tactic
 

@@ -19,36 +19,10 @@ def drop : mvpfunctor n :=
 def last : pfunctor :=
 { A := P.A, B := λ a, (P.B a).last }
 
-def append_contents {α : typevec n} {β : Type*}
+@[reducible] def append_contents {α : typevec n} {β : Type*}
     {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
   P.B a ⟹ α.append1 β :=
 split_fun f' f
-
-def contents_dest_left {α : typevec n} {β : Type*} {a : P.A} (f'f : P.B a ⟹ α.append1 β) :
-  P.drop.B a ⟹ α :=
-drop_fun f'f
-
-def contents_dest_right {α : typevec n} {β : Type*} {a : P.A} (f'f : P.B a ⟹ α.append1 β) :
-  P.last.B a → β :=
-last_fun f'f
-
-theorem contents_dest_left_append_contents {α : typevec n} {β : Type*}
-    {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.contents_dest_left (P.append_contents f' f) = f' := rfl
-
-theorem contents_dest_right_append_contents {α : typevec n} {β : Type*}
-    {a : P.A} (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  P.contents_dest_right (P.append_contents f' f) = f := rfl
-
-theorem append_contents_eta {α : typevec n} {β : Type*} {a : P.A}
-    (f : P.B a ⟹ α.append1 β) :
-  append_contents P (contents_dest_left P f) (contents_dest_right P f) = f :=
-split_drop_fun_last_fun _
-
-theorem append_fun_comp_append_contents {α γ : typevec n} {β δ : Type*} {a : P.A}
-    (g' : α ⟹ γ) (g : β → δ) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
-  append_fun g' g ⊚ P.append_contents f' f = P.append_contents (g' ⊚ f') (g ∘ f) :=
-(split_fun_comp _ _ _ _).symm
 
 /- defines a typevec of labels to assign to each node of P.last.W -/
 inductive W_path : P.last.W → fin' n → Type u
@@ -215,17 +189,13 @@ end
 @[reducible] def apply_append1 {α : typevec n} {β : Type*}
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → β) :
   P.apply (append1 α β) :=
-⟨a, P.append_contents f' f⟩
+⟨a, split_fun f' f⟩
 
 theorem map_apply_append1 {α γ : typevec n} (g : α ⟹ γ)
   (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
 append_fun g (P.W_map g) <$$> P.apply_append1 a f' f =
   P.apply_append1 a (g ⊚ f') (λ x, P.W_map g (f x)) :=
-begin
-  rw [apply_append1, apply_append1, append_contents, append_contents,
-    map_eq, append_fun, ← split_fun_comp],
-  refl
-end
+by rw [apply_append1, apply_append1, map_eq, append_fun, ← split_fun_comp]; refl
 
 /-
 Yet another view of the W type: as a fixed point for a multivariate polynomial functor.
@@ -234,18 +204,18 @@ the qpf axioms are expressed in terms of `map` on `P`.
 -/
 
 def W_mk' {α : typevec n} : P.apply (α.append1 (P.W α)) → P.W α
-| ⟨a, f⟩ := P.W_mk a (P.contents_dest_left f) (P.contents_dest_right f)
+| ⟨a, f⟩ := P.W_mk a (drop_fun f) (last_fun f)
 
 def W_dest' {α : typevec.{u} n} : P.W α → P.apply (α.append1 (P.W α)) :=
-P.W_rec (λ a f' f _, ⟨a, P.append_contents f' f⟩)
+P.W_rec (λ a f' f _, ⟨a, split_fun f' f⟩)
 
 theorem W_dest'_W_mk {α : typevec n}
     (a : P.A) (f' : P.drop.B a ⟹ α) (f : P.last.B a → P.W α) :
-  P.W_dest' (P.W_mk a f' f) = ⟨a, P.append_contents f' f⟩ :=
+  P.W_dest' (P.W_mk a f' f) = ⟨a, split_fun f' f⟩ :=
 by rw [W_dest', W_rec_eq]
 
 theorem W_dest'_W_mk' {α : typevec n} (x : P.apply (α.append1 (P.W α))) :
   P.W_dest' (P.W_mk' x) = x :=
-by cases x with a f; rw [W_mk', W_dest'_W_mk, append_contents_eta]
+by cases x with a f; rw [W_mk', W_dest'_W_mk, split_drop_fun_last_fun]
 
 end mvpfunctor
