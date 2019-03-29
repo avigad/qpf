@@ -584,6 +584,10 @@ do let ls := ls.map (simp_arg_type.expr), -- >>= simp_lemmas.append_pexprs simp_
    -- interactive.dsimp tt ls [] (interactive.loc.ns [none])
    interactive.simp none tt ls [] (interactive.loc.ns [none])
 
+meta def mk_substitution (vs : list expr) : tactic (list expr × list (name × expr)) :=
+do vs' ← intron' vs.length,
+   let σ := (vs.map expr.local_uniq_name).zip vs',
+   pure (vs', σ)
 open interactive.types interactive lean.parser
 
 @[user_command]
