@@ -566,4 +566,42 @@ begin
   apply mem_image_of_mem _ (mem_univ _)
 end
 
+variable (q)
+
+def is_uniform : Prop := ∀ ⦃α : Type u⦄ (a a' : q.P.A) 
+    (f : q.P.B a → α) (f' : q.P.B a' → α),
+  abs ⟨a, f⟩ = abs ⟨a', f'⟩ → f '' univ = f' '' univ
+
+variable [q]
+
+theorem supp_eq_of_is_uniform (h : q.is_uniform) {α : Type u} (a : q.P.A) (f : q.P.B a → α) : 
+  supp (abs ⟨a, f⟩) = f '' univ :=
+begin
+  ext u, rw [mem_supp], split,
+  { intro h', apply h' _ _ rfl },
+  intros h' a' f' e,
+  rw [←h _ _ _ _ e.symm], apply h'
+end
+
+theorem liftp_iff_of_is_uniform (h : q.is_uniform) {α : Type u} (x : F α) (p : α → Prop) :
+  liftp p x ↔ ∀ u ∈ supp x, p u :=
+begin
+  rw [liftp_iff, ←abs_repr x],
+  cases repr x with a f,  split,
+  { rintros ⟨a', f', abseq, hf⟩ u,
+    rw [supp_eq_of_is_uniform h, h _ _ _ _ abseq],
+    rintros ⟨i, _, hi⟩, rw ←hi, apply hf },
+  intro h',
+  refine ⟨a, f, rfl, λ i, h' _ _⟩,
+  rw supp_eq_of_is_uniform h,
+  exact ⟨i, mem_univ i, rfl⟩ 
+end
+
+theorem supp_map (h : q.is_uniform) {α β : Type u} (g : α → β) (x : F α) :
+  supp (g <$> x) = g '' supp x :=
+begin
+  rw ←abs_repr x, cases repr x with a f, rw [←abs_map, pfunctor.map_eq],
+  rw [supp_eq_of_is_uniform h, supp_eq_of_is_uniform h, image_comp]
+end
+  
 end qpf
