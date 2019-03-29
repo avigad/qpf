@@ -513,3 +513,57 @@ def quotient_qpf
   abs_map  := λ {α β} f x, by { rw [abs_map, FG_abs_map] } }
 
 end qpf
+
+/-
+Support.
+-/
+
+namespace qpf
+variables {F : Type u → Type u} [functor F] [q : qpf F]
+include q
+open functor (liftp liftr supp)
+open set
+
+theorem mem_supp {α : Type u} (x : F α) (u : α) :
+  u ∈ supp x ↔ ∀ a f, abs ⟨a, f⟩ = x → u ∈ f '' univ :=
+begin
+  rw [supp], dsimp, split,
+  { intros h a f haf,
+    have : liftp (λ u, u ∈ f '' univ) x,
+    { rw liftp_iff, refine ⟨a, f, haf.symm, λ i, mem_image_of_mem _ (mem_univ _)⟩ },
+    exact h this },
+  intros h p, rw liftp_iff,
+  rintros ⟨a, f, xeq, h'⟩,
+  rcases h a f xeq.symm with ⟨i, _, hi⟩,
+  rw ←hi, apply h'
+end
+
+theorem supp_eq {α : Type u} (x : F α) : supp x = { u | ∀ a f, abs ⟨a, f⟩ = x → u ∈ f '' univ } :=
+by ext; apply mem_supp
+
+theorem has_good_supp_iff {α : Type u} (x : F α) :
+  (∀ p, liftp p x ↔ ∀ u ∈ supp x, p u) ↔
+    ∃ a f, abs ⟨a, f⟩ = x ∧ ∀ a' f', abs ⟨a', f'⟩ = x → f '' univ ⊆ f' '' univ :=
+begin
+  split,
+  { intro h,
+    have : liftp (supp x) x, by rw h; intro u; exact id,
+    rw liftp_iff at this, rcases this with ⟨a, f, xeq, h'⟩,
+    refine ⟨a, f, xeq.symm, _⟩,
+    intros a' f' h'',
+    rintros u ⟨i, _, hfi⟩,
+    have : u ∈ supp x, by rw ←hfi; apply h',
+    exact (mem_supp x u).mp this _ _ h'' },
+  rintros ⟨a, f, xeq, h⟩ p, rw liftp_iff, split,
+  { rintros ⟨a', f', xeq', h'⟩ u usuppx,
+    rcases (mem_supp x u).mp usuppx a' f' xeq'.symm with ⟨i, _, f'ieq⟩,
+    rw ←f'ieq, apply h' },
+  intro h',
+  refine ⟨a, f, xeq.symm, _⟩, intro i,
+  apply h', rw mem_supp,
+  intros a' f' xeq',
+  apply h a' f' xeq',
+  apply mem_image_of_mem _ (mem_univ _)
+end
+
+end qpf

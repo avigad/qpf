@@ -23,7 +23,7 @@ def liftr {α : Type u} (r : α → α → Prop) : F α → F α → Prop :=
   (λ t : {p : α × α // r p.fst p.snd}, t.val.fst) <$> u = x ∧
   (λ t : {p : α × α // r p.fst p.snd}, t.val.snd) <$> u = y
 
-def supp {α : Type u} (x : F α) : set α := { y : α | ∀ {p}, liftp p x → p y }
+def supp {α : Type u} (x : F α) : set α := { y : α | ∀ ⦃p⦄, liftp p x → p y }
 
 theorem of_mem_supp {α : Type u} {x : F α} {p : α → Prop} (h : liftp p x) :
   ∀ y ∈ supp x, p y :=
