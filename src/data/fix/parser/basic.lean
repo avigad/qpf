@@ -92,7 +92,6 @@ do let n₀ := name.anonymous,
    let xs := format!"
 inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
 {format.intercalate \"\n\" brs}",
-   trace xs,
    lean.parser.with_input lean.parser.command_like xs.to_string,
    pure ()
 
@@ -621,7 +620,7 @@ do let n := func.live_params.length,
      rec ← unify_mapp rec (params.map some ++ C :: branches),
      refine ∘ to_pexpr $ rec,
      let cs := func.induct.ctors,
-     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "mvpfunctor",
+     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "pfunctor",
      let eqn := (@const tt func.eqn_name func.induct.u_params).mk_app params,
      cs.mmap $ λ c, solve1 $ do
        { xs ← intros,
@@ -632,6 +631,20 @@ do let n := func.live_params.length,
    t ← pis dead_params t,
    df ← instantiate_mvars df >>= lambdas dead_params,
    add_decl $ mk_definition func.repr_name func.induct.u_names t df
+
+meta def prove_abs_repr (func : internal_mvfunctor) : tactic unit :=
+do trace_state,
+   trace "• A",
+   vs ← destruct_typevec' func `α,
+   let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
+   trace "• A",
+   x ← intro1, cases x,
+   repeat $ do
+   { dunfold_target [func.repr_name,func.abs_name],
+     simp_only [``(typevec.typevec_cases_nil_append1),``(typevec.typevec_cases_cons_append1)],
+     dunfold_target $ [func.pfunctor_name <.> "rec"] ++ cs,
+     `[dsimp],
+     reflexivity }
 
 -- meta def mk_pfunc_mvfunctor_instance (func : internal_mvfunctor) : tactic unit :=
 -- do let n := func.live_params.length,
@@ -659,7 +672,8 @@ do let n := func.live_params.length,
    (_,df) ← solve_aux mvqpf_t $ do
      { let p := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
        refine ``( { P := %%p, abs := %%abs_fn, repr' := %%repr_fn, .. } ),
-       admit, admit },
+       solve1 $ prove_abs_repr func,
+       solve1 $ admit },
    df ← instantiate_mvars df >>= lambdas dead_params,
    mvqpf_t ← pis dead_params mvqpf_t,
    let inst_n := func.def_name <.> "mvqpf",
@@ -701,10 +715,6 @@ universes u_1 u_2 u_3
 
 set_option trace.app_builder true
 set_option pp.universes true
-
--- qpf list_F' (α β : Type)
--- -- | nil : list_F
--- | cons : ℤ → α → β → list_F'
 
 qpf list_F'' (α β : Type)
 | cons : ℤ → (ℕ → α) → (list ℕ → α) → (ℤ → β) → list_F''

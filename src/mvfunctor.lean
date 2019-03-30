@@ -293,8 +293,15 @@ def typevec_cases_cons (n : ℕ) {β : typevec (n+1) → Sort*} (f : Π t (v : t
   Π v, β v :=
 λ v, ♯ f v.last v.drop
 
-open typevec
+lemma typevec_cases_nil_append1 {β : typevec 0 → Sort*} (f : β fin'.elim0) :
+  typevec_cases_nil f fin'.elim0 = f := rfl
 
+lemma typevec_cases_cons_append1 (n : ℕ) {β : typevec (n+1) → Sort*}
+      (f : Π t (v : typevec n), β (v ::: t))
+      (v : typevec n) (α) :
+  typevec_cases_cons n f (v ::: α) = f α v := rfl
+
+open typevec
 
 def typevec_cases_nil₃ {β : Π v v' : typevec 0, v ⟹ v' → Sort*} (f : β fin'.elim0 fin'.elim0 nil_fun) :
   Π v v' f, β v v' f :=
@@ -316,7 +323,11 @@ end
 
 def typevec_cases_nil₂ {β : fin'.elim0 ⟹ fin'.elim0 → Sort*}
   (f : β nil_fun) :
-  Π f, β f := sorry
+  Π f, β f :=
+begin
+  intro g, have : g = nil_fun, ext ⟨ ⟩,
+  rw this, exact f
+end
 
 def typevec_cases_cons₂ (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v ::: t) ⟹ (v' ::: t') → Sort*}
   (F : Π (f : t → t') (fs : v ⟹ v'), β (fs ::: f)) :
@@ -326,6 +337,14 @@ begin
   rw [←split_drop_fun_last_fun fs],
   apply F
 end
+
+lemma typevec_cases_nil₂_append_fun {β : fin'.elim0 ⟹ fin'.elim0 → Sort*}
+  (f : β nil_fun) :
+  typevec_cases_nil₂ f nil_fun = f := rfl
+
+lemma typevec_cases_cons₂_append_fun (n : ℕ) (t t' : Type*) (v v' : typevec (n)) {β : (v ::: t) ⟹ (v' ::: t') → Sort*}
+  (F : Π (f : t → t') (fs : v ⟹ v'), β (fs ::: f)) (f fs) :
+  typevec_cases_cons₂ n t t' v v' F (fs ::: f) = F f fs := rfl
 
 /- for lifting predicates and relations -/
 
