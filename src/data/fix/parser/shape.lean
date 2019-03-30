@@ -72,7 +72,3 @@ do (func', d) ← mk_shape_functor' d,
    pure (func',d)
 
 end tactic
-
--- list
--- tree
--- infinitary tree
