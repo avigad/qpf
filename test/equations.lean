@@ -3,9 +3,6 @@ import data.fix.parser.equations
 
 universes u
 
-set_option trace.app_builder true
-set_option pp.universes true
-
 data list' (γ α β γ' : Type u) : Type u
 | zero : γ → list'
 | succ : γ' → α → (ℤ → β → list') → list'
