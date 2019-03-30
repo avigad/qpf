@@ -138,10 +138,24 @@ do let u := fresh_univ d.induct.u_names,
    add_decl $ mk_definition (n <.> "corec") (u :: d.induct.u_names) t df,
    pure ()
 
+meta def mk_datatype' (iter : name) (d : inductive_decl) : parser (datatype_shape × internal_mvfunctor) :=
+do (func', d) ← mk_shape_functor' d,
+   let func : internal_mvfunctor := { .. func' },
+   mk_mvfunctor_instance func,
+   trace "• A •",
+   mk_pfunctor func,
+   trace "• A •",
+   mk_pfunc_constr func,
+   trace "• A •",
+   mk_pfunc_recursor func,
+   mk_mvqpf_instance func,
+   mk_fixpoint iter func d,
+   pure (func',d)
+
 @[user_command]
 meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
-   (func,d) ← mk_datatype ``mvqpf.fix d,
+   (func,d) ← mk_datatype' ``mvqpf.fix d,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
    trace_error $ mk_recursor func d,

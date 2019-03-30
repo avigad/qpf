@@ -10,29 +10,6 @@ by cases h; apply x
 
 namespace tactic
 
--- meta def coinductive_def (meta_info : decl_meta_info) (_ : parse $ tk "codata") : lean.parser unit :=
--- do decl ← inductive_decl.parse meta_info,
---    decl ← inductive_type.of_decl decl,
---    updateex_env $ λ e, pure $ e.add_namespace decl.name,
---    head_t  ← trace_error $ mk_head_t  decl,
---    child_t ← trace_error $ mk_child_t decl,
---    _       ← trace_error $ mk_branch_discr decl head_t child_t,
---    _       ← trace_error $ mk_pos_functor   decl,
---    _       ← trace_error $ mk_positive_inst decl,
---    _       ← trace_error $ mk_cofix  decl,
---    _       ← trace_error $ mk_constr decl,
---    _       ← trace_error $ mk_cases  decl,
---    _       ← trace_error $ mk_no_confusion_type decl,
---    _       ← trace_error $ mk_no_confusion decl,
---    _       ← trace_error $ mk_bisimulation_pred decl,
---    add_meta_definition (decl.name <.> "_info") [] `(inductive_type) (reflect decl),
---    coinduct_ctor.attr.set (decl.name <.> "_info") () tt,
---    pure ()
-
-meta def mk_qpf_instance : tactic unit :=
-do
-   fail "fo"
-
 open native
 
 meta def map_arg' (m : rb_map expr expr) : expr → expr → tactic expr
@@ -85,9 +62,7 @@ meta def level.repr : level → ℕ → string
                          else sformat!"({n} + {repr a})"
 
 meta instance level.has_repr : has_repr level := ⟨ λ l, level.repr l 0 ⟩
--- | x := _
 
--- attribute [derive has_reflect] reducibility_hints declaration
 attribute [derive has_repr] reducibility_hints declaration type_cnstr inductive_type
 
 @[derive has_repr]
@@ -102,7 +77,6 @@ meta structure internal_mvfunctor :=
 (params : list expr)
 (type : expr)
 
--- @[replaceable]
 meta def mk_inductive' : inductive_type → lean.parser unit
 | decl :=
 do let n₀ := name.anonymous,
@@ -118,7 +92,7 @@ do let n₀ := name.anonymous,
    let xs := format!"
 inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
 {format.intercalate \"\n\" brs}",
-   -- trace xs,
+   trace xs,
    lean.parser.with_input lean.parser.command_like xs.to_string,
    pure ()
 
@@ -153,30 +127,6 @@ do let decl := declaration.cnst ind.name ind.u_names ind.type tt,
           dead_params := m',
           params := params,
           type := t }
-
--- meta def internalize_mvfunctor (n : name) : tactic internal_mvfunctor :=
--- do let df_name := n <.> "internal",
---    let lm_name := n <.> "internal_eq",
---    decl ← get_decl n,
---    (params,t) ← mk_local_pis decl.type,
---    (m,m') ← live_vars n params,
---    let m := rb_map.sort prod.snd m.to_list,
---    let m' := rb_map.sort prod.snd m'.to_list,
---    u ← mk_meta_univ,
---    let vars := string.intercalate "," (m.map to_string),
---    params.mmap' (λ e, infer_type e >>= unify (expr.sort u)) <|> fail format!"live type parameters ({params}) are not in the same universe",
---    (level.succ u) ← get_univ_assignment u <|> pure level.zero.succ,
---    pure { decl := decl,
---           def_name := df_name,
---           eqn_name := lm_name,
---           map_name := (df_name <.> "map"),
---           pfunctor_name := n <.> "pfunctor",
---           vec_lvl := u,
---           univ_params := decl.univ_params.map level.param,
---           live_params := m,
---           dead_params := m',
---           params := params,
---           type := t }
 
 notation `⦃ ` r:( foldr `, ` (h t, typevec.append1 t h) fin'.elim0 ) ` ⦄` := r
 notation `⦃`  `⦄` := fin'.elim0
@@ -445,8 +395,6 @@ do d ← inductive_type.of_pfunctor func,
    add_decl $ mk_definition func.pfunctor_name func.decl.univ_params t df,
    pure ()
 
-#check mzip_with'
-
 meta def mk_pfunc_constr (func : internal_mvfunctor) : tactic unit :=
 do env ← get_env,
    let cs := env.constructors_of func.decl.to_name,
@@ -467,111 +415,42 @@ do env ← get_env,
                  do { t ← infer_type v,
                       pure $ ¬ ∃ v ∈ func.live_params, expr.occurs (prod.fst v) t },
 
-          trace c ,
           let e := (@const tt hd_c func.univ_params).mk_app (func.dead_params.map prod.fst ++ rec),
           ms ← func.live_params.mmap $ λ l,
                 do { let l_name := l.1.local_pp_name,
                      vs' ← vs'.mfilter $ λ v,
                        do { t ← infer_type v,
                             pure $ expr.occurs l.1 t },
-                     let ch_t := (@const tt (func.decl.to_name <.> "child_t" ++ l_name) func.univ_params).mk_app (func.dead_params.map prod.fst ++ [e]),
-                     let ch_c := c.update_prefix (func.decl.to_name <.> "child_t" ++ l_name),
                      y ← infer_type e >>= mk_local_def `y,
                      hy ← mk_app `eq [y,e] >>= mk_local_def `hy,
+                     let ch_t := (@const tt (func.decl.to_name <.> "child_t" ++ l_name) func.univ_params).mk_app (func.dead_params.map prod.fst ++ [y]),
+                     let ch_c := c.update_prefix (func.decl.to_name <.> "child_t" ++ l_name),
                      t ← pis (vs' ++ rec ++ [y,hy]) $ ch_t.imp l.1,
                      (_,f) ← @solve_aux unit t $ do
                        { (vs',σ₀) ← mk_substitution vs' ,
                          (rec,σ₁) ← mk_substitution rec ,
                          y ← intro1, hy ← intro1,
-                         mk_eq_symm hy >>= rewrite_target,
-                         -- interactive.generalize `hy () (to_pexpr e,`y),
-                                  trace "\n• A",
-                                  trace_state,
-                         trace_expr e, trace rec,
-                         -- hy ← get_local `hy,
-                         -- hy' ← mk_eq_symm hy >>= note `hy none,
-                         -- clear hy,
-                         -- trace_state,
                          x ← intro `x,
-                         -- trace_expr x,
                          interactive.generalize `hx () (to_pexpr x,`x'),
-                         -- trace_state,
-                         -- trace_expr x,
-                                  -- trace "\n• C", trace _,
-                                  -- trace_state,
                          solve1 $ do
-                         { trace_expr x, -- trace_state,
-                           a ← better_induction x, -- trace a,
-                           -- trace "\n• C", trace $ a.map prod.fst,
-                           -- trace_state,
+                         { a ← better_induction x,
                            gs ← get_goals,
                            rs ← mzip_with (λ (x : name × list (expr × option expr) × list (name × expr)) g,
                              do let ⟨ctor,a,b⟩ := x,
                                 set_goals [g],
                                 cases $ hy.instantiate_locals b,
-                                -- trace_state,
                                 gs ← get_goals,
                                 pure $ gs.map $ λ g, (a,b,g)) a gs,
-                           -- let (as,bs,gs) := rs.join.unzip₃,
-                           trace "\n• C",
                            mzip_with' (λ (v : expr) (r : list (expr × option expr) × list (name × expr) × expr),
                              do let (a,b,g) := r,
                                 set_goals [g],
-                                trace_state, trace "", trace_expr v, trace "•",
                                 x' ← get_local `x',
                                 expr.app _ t ← infer_type x',
                                 let ts := t.get_app_args.length - func.dead_params.length,
                                 let a' := (a.drop ts).map prod.fst, exact $ v.mk_app a' ) vs' rs.join,
-                           trace_state,
-                           skip
-                           -- do { hy ← get_local `hy,
-                           --      -- trace "• E", trace a,
-                           --      let no_conf := func.decl.to_name <.> "head_t" <.> "no_confusion",
-                           --      tgt ← target,
-                           --      mk_mapp no_conf (func.dead_params.map (some ∘ prod.fst) ++ [tgt,none,none,hy]) >>= apply,
-                           --      vs'.mmap trace_expr,
-                           --      trace vs',
-                           --        trace "\n• ABC - goals vs vs'",
-                           --        trace_state,
-
-                           --      vs'.mmap $ λ v, do {
-                           --        trace_state,
-                           --        try $ trace_error $ intro1 >>= subst,
-                           --        trace "\n• A",
-                           --        trace_state,
-                           --        -- a.mmap (trace_expr ∘ prod.fst),
-                           --        trace a,
-                           --        a.mmap (infer_type ∘ expr.instantiate_locals (σ₀ ++ σ₁ ++ b) ∘ prod.fst),
-                           --        trace "\n• B",
-                           --        -- trace_state,
-                           --        -- a.mmap $ trace_expr ∘ prod.fst, trace ctor,
-                           --        trace a,
-                           --        trace_expr v,
-                           --        trace_expr $ v.instantiate_locals b,
-                           --        x' ← get_local `x',
-                           --        trace_expr x',
-                           --        trace "• BB",
-                           --        expr.app _ t ← infer_type x',
-                           --        trace "• BBB", trace vs', trace rec,
-                           --        let ts := t.get_app_args.length - func.dead_params.length,
-                           --        let a' := (a.drop ts).map prod.fst,
-                           --        a'.mmap (infer_type ∘ expr.instantiate_locals (σ₀ ++ σ₁ ++ b)),
-                           --        trace "• CCC",
-                           --        -- b.mmap $ trace,
-                           --        trace_expr v,
-                           --        let e := (v.mk_app a'), -- .instantiate_locals b,
-                           --        -- trace e.list_meta_vars,
-                           --        g ← main_goal,
-                           --        -- trace_expr $ e.instantiate_locals b,
-                           --        unify (e.instantiate_locals b) g,
-                           --        exact $ (v.mk_app a').instantiate_locals b,
-                           --        trace "• D"
-                           --        -- exact (v.mk_app $ a.map prod.fst) <|> exact v
-                           --        } }
-                                  } },
+                           skip } },
                      pr ← mk_eq_refl e,
                      pure $ f.mk_app $ vs' ++ rec ++ [e,pr] },
-          trace c ,
           (_,df) ← solve_aux r $ do
             { m ← mk_map_vec func.vec_lvl ms,
               refine ``( ⟨ %%e, _ ⟩ ),
@@ -634,22 +513,23 @@ section zip_vars
 variables (n : name) (univs : list level)
   (args : list expr) (shape_args : list expr)
 
-meta def mk_child_arg (e : expr) : list (expr × expr × ℕ) → list (expr × expr × ℕ) × list expr × expr
+meta def mk_child_arg (e : expr × list expr) : list (expr × expr × ℕ) → list (expr × expr × ℕ) × list expr × expr
 | [] := ([],shape_args.tail,shape_args.head)
 | (⟨v,e',i⟩::vs) :=
-if v.occurs e
+if v.occurs e.1
   then let c : expr := const ( (n.update_prefix $ n.get_prefix ++ v.local_pp_name).append_after i ) univs
-       in ( ⟨v,e',i+1⟩::vs, shape_args, e' $ c.mk_app args)
+       in ( ⟨v,e',i+1⟩::vs, shape_args, expr.lambdas e.2 $ e' $ c.mk_app $ args ++ e.2)
   else prod.map (cons ⟨v,e',i⟩) id $ mk_child_arg vs
 
-meta def zip_vars' : list expr → list (expr × expr × ℕ) → list expr → list expr
+meta def zip_vars' : list expr → list (expr × expr × ℕ) → list (expr × list expr) → list expr
 | _ xs [] := []
 | shape_args xs (v :: vs) :=
 let (xs',shape_args',v') := mk_child_arg n univs args shape_args v xs in
-v' :: zip_vars' shape_args xs' vs
+v' :: zip_vars' shape_args' xs' vs
 
-meta def zip_vars (ls : list (expr × expr)) : list expr → list expr :=
-zip_vars' n univs args shape_args $ ls.map $ λ x, (x.1,x.2,0)
+meta def zip_vars (ls : list (expr × expr)) (vs : list expr) : tactic $ list expr :=
+do vs' ← vs.mmap $ λ v, do { (vs,_) ← infer_type v >>= mk_local_pis, pure (v,vs) },
+   pure $ zip_vars' n univs args shape_args (ls.map $ λ x, (x.1,x.2,0)) vs'
 
 end zip_vars
 
@@ -674,17 +554,16 @@ do let u := fresh_univ func.induct.u_names,
               ⟨n,xs,[(_,n_snd)]⟩ ← pure (v : name × list expr × list (name × expr)),
               fs ← destruct_multimap n_snd,
               n_snd ← mk_map_vec func.vec_lvl fs,
-              let child_n := c.name.update_prefix $ c.name.get_prefix <.> "child_t",
+              let child_n := c.name.update_prefix $ func.induct.name <.> "child_t",
               let subst := (func.live_params.map prod.fst).zip fs,
-              let h_args := zip_vars child_n func.induct.u_params (dead_params ++ xs) xs subst c.args,
+              h_args ← zip_vars child_n func.induct.u_params (dead_params ++ xs) xs subst c.args,
               let h := h.mk_app h_args,
               let n_fst := (@const tt n func.induct.u_params).mk_app $ func.dead_params.map prod.fst ++ xs,
               vec ← mk_live_vec func.vec_lvl $ func.live_params.map prod.fst,
               fn ← mk_const ``santas_helper,
               unify_mapp fn [none,none,vec,C,none,none,n_snd,h,none] >>= refine ∘ to_pexpr,
-              congr; ext [rcases_patt.many [[rcases_patt.one `_]]] none; reflexivity,
-              get_goals }) cases_t gs hs,
-       set_goals gs.join,
+              reflexivity <|> congr; ext [rcases_patt.many [[rcases_patt.one `_]]] none; reflexivity,
+              done }) cases_t gs hs,
        pure () },
    let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t.map prod.snd,
    df ← instantiate_mvars df >>= lambdas vs,
@@ -762,7 +641,6 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_mvfunctor_instance func,
    mk_pfunctor func,
    trace_error $ mk_pfunc_constr func,
-   trace "A",
    trace_error $ mk_pfunc_recursor func,
    -- mk_pfunc_map func,
    -- mk_pfunc_mvfunctor_instance func,
