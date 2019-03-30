@@ -19,6 +19,7 @@ data tree (α β : Type)
 -- #check tree.cons
 -- #check @tree.cases_on
 -- #check @tree.rec
+-- #check @tree.drec
 
 codata tree' (α β : Type)
 | nil : tree'
@@ -37,4 +38,4 @@ codata tree' (α β : Type)
 -- #check tree'.cons
 -- #check @tree'.cases_on
 -- #check @tree'.corec
--- #check @tree'.eq_of_bisim
+-- #check @tree'.bisim
