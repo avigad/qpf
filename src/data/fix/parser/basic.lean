@@ -192,7 +192,7 @@ do d ← inductive_type.of_decl d,
 
 open typevec
 
-meta def destruct_typevec (func : internal_mvfunctor) (v : name) : tactic (list $ expr × expr × expr × ℕ) :=
+meta def destruct_typevec₃ (func : internal_mvfunctor) (v : name) : tactic (list $ expr × expr × expr × ℕ) :=
 do vs ← func.live_params.reverse.mmap $ λ x : expr × ℕ, do
      { refine ``(typevec_cases_cons₃ _ _),
        α ← get_unused_name `α >>= intro,
@@ -200,6 +200,14 @@ do vs ← func.live_params.reverse.mmap $ λ x : expr × ℕ, do
        f ← get_unused_name `f >>= intro,
        pure (α,β,f,x.2) },
    refine ``(typevec_cases_nil₃ _),
+   pure vs
+
+meta def destruct_typevec' (func : internal_mvfunctor) (v : name) : tactic (list $ expr × ℕ) :=
+do vs ← func.live_params.reverse.mmap $ λ x : expr × ℕ, do
+     { refine ``(typevec_cases_cons _ _),
+       α ← get_unused_name `α >>= intro,
+       pure (α,x.2) },
+   refine ``(typevec_cases_nil _),
    pure vs
 
 def mk_arg_list {α} (xs : list (α × ℕ)) : list α :=
@@ -224,7 +232,7 @@ do let decl := func.decl,
    (_,df) ← @solve_aux unit map_t $ do
      { vs ← intron' func.dead_params.length,
        let vs := vs.zip $ func.dead_params.map prod.snd,
-       mαβf ← destruct_typevec func `α,
+       mαβf ← destruct_typevec₃ func `α,
        let m := rb_map.of_list $ mαβf.map $ λ ⟨α,β,f,i⟩, (α,f),
        let β := mαβf.map $ λ ⟨α,β,f,i⟩, (β,i),
        target >>= instantiate_mvars >>= unsafe_change,
@@ -503,7 +511,7 @@ do `(%%v₀ ⟹ %%v₁) ← infer_type e,
    destruct_multimap' n v₀ v₁ [] <*
      intron (n_h-1)
 
-lemma santas_helper {n} {P : mvpfunctor n} {α} (C : P.apply α → Sort*) {a : P.A} {b} (b')
+def santas_helper {n} {P : mvpfunctor n} {α} (C : P.apply α → Sort*) {a : P.A} {b} (b')
   (x : C ⟨a,b⟩) (h : b = b') : C ⟨a,b'⟩ :=
 by cases h; exact x
 
@@ -568,7 +576,7 @@ do let u := fresh_univ func.induct.u_names,
    let vs := func.params.map expr.to_implicit_binder ++ C :: cases_t.map prod.snd,
    df ← instantiate_mvars df >>= lambdas vs,
    t ← pis (vs ++ [n]) (C n),
-   add_decl $ declaration.thm (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t (pure df),
+   add_decl $ mk_definition (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t df,
    pure ()
 
 meta def mk_qpf_abs (func : internal_mvfunctor) : tactic unit :=
@@ -576,8 +584,28 @@ do let n := func.live_params.length,
    let dead_params := func.dead_params.map prod.fst,
    let e := (@const tt func.def_name func.induct.u_params).mk_app dead_params,
    let e' := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
-   t ← to_expr ``(∀ v, mvpfunctor.apply %%e' v → %%e v) >>= pis dead_params,
-   let df := t.mk_sorry,
+   -- v ← mk_local_def `v (@const tt ``typevec [func.vec_lvl] (reflect n)),
+   t ← to_expr ``(∀ v, mvpfunctor.apply %%e' v → %%e v),
+   -- let df := t.mk_sorry,
+   (_,df) ← @solve_aux unit t $ do
+   { vs ← destruct_typevec' func `v,
+     C ← mk_motive,
+     let params := (rb_map.sort prod.snd $ func.dead_params ++ vs).map prod.fst,
+     let rec := @const tt (func.pfunctor_name <.> "rec") $ level.succ func.vec_lvl :: func.induct.u_params,
+     let branches := list.repeat (@none expr) func.induct.ctors.length,
+     rec ← unify_mapp rec (params.map some ++ C :: branches),
+     refine ∘ to_pexpr $ rec,
+     let cs := func.induct.ctors,
+     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "mvpfunctor",
+     let eqn := (@const tt func.eqn_name func.induct.u_params).mk_app params,
+     cs.mmap $ λ c, solve1 $ do
+       { xs ← intros,
+         let n := c.name.update_prefix func.induct.name,
+         let e := (@const tt n func.induct.u_params).mk_app $ params ++ xs,
+         mk_eq_mpr eqn e >>= exact },
+     done },
+   t ← pis dead_params t,
+   df ← instantiate_mvars df >>= lambdas dead_params,
    add_decl $ mk_definition func.abs_name func.induct.u_names t df
 
 meta def mk_qpf_repr (func : internal_mvfunctor) : tactic unit :=
@@ -656,7 +684,7 @@ namespace hidden
 universes u_1 u_2 u_3
 
 set_option trace.app_builder true
--- set_option pp.universes true
+set_option pp.universes true
 
 -- qpf list_F' (α β : Type)
 -- -- | nil : list_F
@@ -755,6 +783,8 @@ qpf list_F (α : Type)
 --       _ =
 --     list_F'.cons (f0 a) (f1 a_1) :=
 -- list_F'.internal.map._equation_1
+set_option trace.app_builder true
+set_option pp.universes true
 
 -- @[derive mvqpf]
 qpf list_F''_ (α β γ : Type u)
