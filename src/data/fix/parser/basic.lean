@@ -464,7 +464,7 @@ do env ← get_env,
               refine ``( ⟨ %%e, _ ⟩ ),
               exact m,
               pure () },
-          let c' := c.update_prefix $ c.get_prefix <.> "mvpfunctor",
+          let c' := c.update_prefix $ c.get_prefix <.> "pfunctor",
           let vs := func.params ++ args,
           r  ← pis vs r >>= instantiate_mvars,
           df ← instantiate_mvars df >>= lambdas vs,
@@ -472,16 +472,16 @@ do env ← get_env,
           pure () },
    pure ()
 
-meta def saturate' : expr → expr → tactic expr
-| (expr.pi n bi t b) e :=
-do v ← mk_meta_var t,
-   t ← whnf $ b.instantiate_var v,
-   saturate' t (e v)
-| t e := pure e
+-- meta def saturate' : expr → expr → tactic expr
+-- | (expr.pi n bi t b) e :=
+-- do v ← mk_meta_var t,
+--    t ← whnf $ b.instantiate_var v,
+--    saturate' t (e v)
+-- | t e := pure e
 
-meta def saturate (e : expr) : tactic expr :=
-do t ← infer_type e >>= whnf,
-   saturate' t e
+-- meta def saturate (e : expr) : tactic expr :=
+-- do t ← infer_type e >>= whnf,
+--    saturate' t e
 
 open nat expr
 
@@ -548,7 +548,7 @@ do let u := fresh_univ func.induct.u_names,
    C ← mk_local' `C binder_info.implicit (expr.imp fn $ expr.sort $ level.param u),
    let dead_params := func.dead_params.map prod.fst,
    cases_t ← func.induct.ctors.mmap $ λ c,
-   do { let n := c.name.update_prefix (func.decl.to_name <.> "mvpfunctor"),
+   do { let n := c.name.update_prefix (func.decl.to_name <.> "pfunctor"),
         let e := (@expr.const tt n func.induct.u_params).mk_app (func.params ++ c.args),
         prod.mk c <$> (pis c.args (C e) >>= mk_local_def `v) },
    n ← mk_local_def `n fn,
@@ -584,9 +584,7 @@ do let n := func.live_params.length,
    let dead_params := func.dead_params.map prod.fst,
    let e := (@const tt func.def_name func.induct.u_params).mk_app dead_params,
    let e' := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
-   -- v ← mk_local_def `v (@const tt ``typevec [func.vec_lvl] (reflect n)),
    t ← to_expr ``(∀ v, mvpfunctor.apply %%e' v → %%e v),
-   -- let df := t.mk_sorry,
    (_,df) ← @solve_aux unit t $ do
    { vs ← destruct_typevec' func `v,
      C ← mk_motive,
@@ -596,7 +594,7 @@ do let n := func.live_params.length,
      rec ← unify_mapp rec (params.map some ++ C :: branches),
      refine ∘ to_pexpr $ rec,
      let cs := func.induct.ctors,
-     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "mvpfunctor",
+     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "pfunctor",
      let eqn := (@const tt func.eqn_name func.induct.u_params).mk_app params,
      cs.mmap $ λ c, solve1 $ do
        { xs ← intros,
@@ -613,8 +611,26 @@ do let n := func.live_params.length,
    let dead_params := func.dead_params.map prod.fst,
    let e := (@const tt func.def_name func.induct.u_params).mk_app dead_params,
    let e' := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
-   t ← to_expr ``(∀ v, %%e v → mvpfunctor.apply %%e' v) >>= pis dead_params,
-   let df := t.mk_sorry,
+   t ← to_expr ``(∀ v, %%e v → mvpfunctor.apply %%e' v),
+   (_,df) ← @solve_aux unit t $ do
+   { vs ← destruct_typevec' func `v,
+     C ← mk_motive,
+     let params := (rb_map.sort prod.snd $ func.dead_params ++ vs).map prod.fst,
+     let rec := @const tt (func.induct.name <.> "rec") $ level.succ func.vec_lvl :: func.induct.u_params,
+     let branches := list.repeat (@none expr) func.induct.ctors.length,
+     rec ← unify_mapp rec (params.map some ++ C :: branches),
+     refine ∘ to_pexpr $ rec,
+     let cs := func.induct.ctors,
+     let c' := cs.map $ λ c : type_cnstr, c.name.update_prefix $ c.name.get_prefix <.> "mvpfunctor",
+     let eqn := (@const tt func.eqn_name func.induct.u_params).mk_app params,
+     cs.mmap $ λ c, solve1 $ do
+       { xs ← intros,
+         let n := c.name.update_prefix func.pfunctor_name,
+         let e := (@const tt n func.induct.u_params).mk_app $ params ++ xs,
+         exact e },
+     done },
+   t ← pis dead_params t,
+   df ← instantiate_mvars df >>= lambdas dead_params,
    add_decl $ mk_definition func.repr_name func.induct.u_names t df
 
 -- meta def mk_pfunc_mvfunctor_instance (func : internal_mvfunctor) : tactic unit :=
@@ -834,7 +850,7 @@ qpf list_F''' (α β γ : Type u)
 | nil : list_F'''
 | cons : (γ → β) → list_F'''
 
-#check hidden.list_F'''.mvpfunctor.cons
+#check hidden.list_F'''.pfunctor.cons
 
 -- #exit
 -- #print hidden.list_F'''.head_t
@@ -879,7 +895,7 @@ qpf list_F'''' (α β γ : Type u)
 | cons : (α → β) → list_F''''
 
 #print prefix hidden.list_F''''
-#check hidden.list_F''''.mvpfunctor.cons
+#check hidden.list_F''''.pfunctor.cons
 
 -- #print hidden.list_F''''.head_t
 -- #print hidden.list_F''''.child_t
