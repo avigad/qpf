@@ -189,7 +189,7 @@ begin
   rw [cofix.mk, cofix.dest_corec, ←comp_map, ←cofix.mk, ← append_fun_comp, this, id_comp, append_fun_id_id, id_map]
 end
 
-noncomputable instance mvqpf_cofix (α : typevec n) : mvqpf (cofix F) :=
+noncomputable instance mvqpf_cofix : mvqpf (cofix F) :=
 { P         := q.P.Mp,
   abs       := λ α, quot.mk Mcongr,
   repr'     := λ α, quot.out,

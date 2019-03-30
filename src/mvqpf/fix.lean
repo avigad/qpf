@@ -243,7 +243,7 @@ begin
   apply ih
 end
 
-instance mvqpf_fix (α : typevec n) : mvqpf (fix F) :=
+instance mvqpf_fix : mvqpf (fix F) :=
 { P         := q.P.Wp,
   abs       := λ α, quot.mk Wequiv,
   repr'     := λ α, fix_to_W,

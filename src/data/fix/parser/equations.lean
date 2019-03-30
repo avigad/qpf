@@ -138,6 +138,32 @@ do let u := fresh_univ d.induct.u_names,
    add_decl $ mk_definition (n <.> "corec") (u :: d.induct.u_names) t df,
    pure ()
 
+meta def mk_fix_functor_instance (func : internal_mvfunctor) : tactic unit :=
+do let params := func.dead_params.map prod.fst,
+   let c := (@const tt func.def_name func.induct.u_params).mk_app params,
+   let shape_c := (@const tt (func.induct.name <.> "shape" <.> "internal") func.induct.u_params).mk_app params,
+   t ← mk_app ``mvfunctor [c] >>= pis params,
+   df ← mk_mapp ``mvqpf.fix.mvfunctor [none,shape_c,none,none] >>= lambdas params,
+   add_decl $ mk_definition (func.induct.name <.> "mvfunctor") func.induct.u_names t df,
+   set_basic_attribute `instance (func.induct.name <.> "mvfunctor"),
+   t ← mk_mapp ``mvqpf [none,c,none] >>= pis params,
+   df ← mk_mapp ``mvqpf.mvqpf_fix [none,shape_c,none,none] >>= lambdas params,
+   add_decl $ mk_definition (func.induct.name <.> "mvqpf") func.induct.u_names t df,
+   set_basic_attribute `instance (func.induct.name <.> "mvqpf")
+
+meta def mk_cofix_functor_instance (func : internal_mvfunctor) : tactic unit :=
+do let params := func.dead_params.map prod.fst,
+   let c := (@const tt func.def_name func.induct.u_params).mk_app params,
+   let shape_c := (@const tt (func.induct.name <.> "shape" <.> "internal") func.induct.u_params).mk_app params,
+   t ← mk_app ``mvfunctor [c] >>= pis params,
+   df ← mk_mapp ``mvqpf.cofix.mvfunctor [none,shape_c,none,none] >>= lambdas params,
+   add_decl $ mk_definition (func.induct.name <.> "mvfunctor") func.induct.u_names t df,
+   set_basic_attribute `instance (func.induct.name <.> "mvfunctor"),
+   t ← mk_mapp ``mvqpf [none,c,none] >>= pis params,
+   df ← mk_mapp ``mvqpf.mvqpf_cofix [none,shape_c,none,none] >>= lambdas params,
+   add_decl $ mk_definition (func.induct.name <.> "mvqpf") func.induct.u_names t df,
+   set_basic_attribute `instance (func.induct.name <.> "mvqpf")
+
 @[user_command]
 meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
@@ -146,6 +172,7 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
    trace_error $ mk_recursor func d,
    trace_error $ mk_dep_recursor func d,
+   trace_error $ mk_fix_functor_instance d,
    pure ()
 
 @[user_command]
@@ -155,6 +182,7 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_constr ``mvqpf.cofix.mk d,
    trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
    trace_error $ mk_corecursor func d,
+   trace_error $ mk_cofix_functor_instance d,
    pure ()
 
 end tactic
