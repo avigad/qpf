@@ -256,6 +256,14 @@ lemma append_fun_comp {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Type*
   f₁ ⊚ f₀ ::: g₁ ∘ g₀ = (f₁ ::: g₁) ⊚ (f₀ ::: g₀) :=
 eq_of_drop_last_eq (λ _, rfl) rfl
 
+lemma append_fun_comp' {α₀ α₁ α₂ : typevec n} {β₀ β₁ β₂ : Type*}
+    (f₀ : α₀ ⟹ α₁) (f₁ : α₁ ⟹ α₂) (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
+  (f₁ ::: g₁) ⊚ (f₀ ::: g₀) = f₁ ⊚ f₀ ::: g₁ ∘ g₀ :=
+eq_of_drop_last_eq (λ _, rfl) rfl
+
+lemma nil_fun_comp {α₀ : typevec 0} (f₀ : α₀ ⟹ fin'.elim0) : nil_fun ⊚ f₀ = f₀ :=
+funext $ λ x, fin'.elim0 x
+
 theorem append_fun_comp_id {α : typevec n} {β₀ β₁ β₂ : Type*}
     (g₀ : β₀ → β₁) (g₁ : β₁ → β₂) :
   @id _ α ::: g₁ ∘ g₀ = (id ::: g₁) ⊚ (id ::: g₀) :=
