@@ -280,7 +280,7 @@ eq_of_drop_last_eq (λ _, rfl) rfl
 instance subsingleton0 : subsingleton (typevec 0) :=
 ⟨ λ a b, funext $ λ a, fin'.elim0 a  ⟩
 
--- run_cmd mk_simp_attr `typevec
+run_cmd mk_simp_attr `typevec
 -- attribute [typevec]
 
 local prefix `♯`:0 := cast (by try { simp }; congr' 1; try { simp })

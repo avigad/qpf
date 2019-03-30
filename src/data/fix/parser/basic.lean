@@ -2,6 +2,7 @@
 import data.fix.inductive_decl
 import mvqpf
 import data.fix.equations
+import category.bitraversable.instances
 
 universes u
 
@@ -578,6 +579,25 @@ do let u := fresh_univ func.induct.u_names,
    add_decl $ mk_definition (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t df,
    pure ()
 
+meta def mk_pfunc_rec_eqns (func : internal_mvfunctor) : tactic unit :=
+do let u := fresh_univ func.induct.u_names,
+   let rec := (@const tt (func.pfunctor_name <.> "rec") (level.param u :: func.induct.u_params)).mk_app func.params,
+   let eqn := (@const tt func.eqn_name func.induct.u_params).mk_app func.params,
+   (C::fs,_) ← infer_type rec >>= mk_local_pis,
+   let rec := rec C,
+   let fs := fs.init,
+   mzip_with' (λ (c : type_cnstr) (f : expr), do
+   { let cn := c.name.update_prefix $ c.name.get_prefix <.> "pfunctor",
+     let c := (@const tt cn func.induct.u_params).mk_app func.params,
+     (args,_) ← infer_type c >>= mk_local_pis,
+     let x := c.mk_app args,
+     t ← mk_app `eq [rec.mk_app (fs ++ [x]),f.mk_app args] >>= pis (func.params ++ C :: fs ++ args),
+     let df := t.mk_sorry,
+     let n := cn.append_suffix "_rec",
+     add_decl $ declaration.thm n (u :: func.induct.u_names) t (pure df),
+     simp_attr.typevec.set n () tt }) func.induct.ctors fs,
+   skip
+
 meta def mk_qpf_abs (func : internal_mvfunctor) : tactic unit :=
 do let n := func.live_params.length,
    let dead_params := func.dead_params.map prod.fst,
@@ -632,12 +652,35 @@ do let n := func.live_params.length,
    df ← instantiate_mvars df >>= lambdas dead_params,
    add_decl $ mk_definition func.repr_name func.induct.u_names t df
 
-meta def prove_abs_repr (func : internal_mvfunctor) : tactic unit :=
-do trace_state,
-   trace "• A",
-   vs ← destruct_typevec' func `α,
+open bitraversable
+
+meta def mk_pfunctor_map_eqn (func : internal_mvfunctor) : tactic unit :=
+do β ← func.live_params.mmap $ tfst renew,
+   fs ← mzip_with (λ x y : expr × _, mk_local_def `f $ x.1.imp y.1) func.live_params β,
+   vf ← mk_map_vec func.vec_lvl fs,
    let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
-   trace "• A",
+   let params' := (rb_map.sort prod.snd $ func.dead_params ++ β).map prod.fst,
+   cs.mmap' $ λ cn,
+     do { let c := (@const tt cn func.induct.u_params).mk_app func.params,
+          let c' := (@const tt cn func.induct.u_params).mk_app params',
+          (vs,_) ← infer_type c >>= mk_local_pis,
+          lhs ← mk_app ``mvfunctor.map [vf,c.mk_app vs],
+          vs' ← vs.mmap $ λ v,
+            do { some (_,f) ← pure $ ((func.live_params.map prod.fst).zip fs).find $ λ x : expr × expr, x.1.occurs v | pure v,
+                 (ws,_) ← infer_type v >>= mk_local_pis,
+                 lambdas ws (f $ v.mk_app ws) },
+          let rhs := c'.mk_app vs',
+          t ← mk_app `eq [lhs,rhs] >>= pis (func.params ++ β.map prod.fst ++ fs ++ vs),
+          let df := t.mk_sorry,
+          let n := cn.append_suffix "_map",
+          add_decl $ declaration.thm n func.induct.u_names t (pure df),
+          let n' := mk_simp_attr_decl_name `typevec,
+          simp_attr.typevec.set n () tt },
+   skip
+
+meta def prove_abs_repr (func : internal_mvfunctor) : tactic unit :=
+do vs ← destruct_typevec' func `α,
+   let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
    x ← intro1, cases x,
    repeat $ do
    { dunfold_target [func.repr_name,func.abs_name],
@@ -645,6 +688,22 @@ do trace_state,
      dunfold_target $ [func.pfunctor_name <.> "rec"] ++ cs,
      `[dsimp],
      reflexivity }
+
+meta def prove_abs_map (func : internal_mvfunctor) : tactic unit :=
+do vs ← destruct_typevec₃ func `α,
+   C ← mk_motive,
+   let vs := vs.map $ λ ⟨α,β,f,i⟩, (α,i),
+   let params := (rb_map.sort prod.snd $ func.dead_params ++ vs).map prod.fst,
+   let rec_n := func.pfunctor_name <.> "rec",
+   let rec := (@const tt rec_n $ level.zero :: func.induct.u_params).mk_app (params ++ [C]),
+   let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
+   apply rec,
+   all_goals $ do
+   { intros,
+     dunfold_target [func.repr_name,func.abs_name],
+     simp_only [``(typevec.typevec_cases_nil_append1),``(typevec.typevec_cases_cons_append1)] [`typevec],
+     reflexivity },
+   trace_state
 
 -- meta def mk_pfunc_mvfunctor_instance (func : internal_mvfunctor) : tactic unit :=
 -- do let n := func.live_params.length,
@@ -667,13 +726,14 @@ do let n := func.live_params.length,
    let repr_fn := (@const tt func.repr_name func.induct.u_params).mk_app dead_params,
    mk_qpf_abs func,
    mk_qpf_repr func,
+   mk_pfunctor_map_eqn func,
    pfunctor_i ← mk_mapp ``mvfunctor [some (reflect n),e] >>= mk_instance,
    mvqpf_t ← mk_mapp ``mvqpf [some (reflect n),e,pfunctor_i] >>= instantiate_mvars,
    (_,df) ← solve_aux mvqpf_t $ do
      { let p := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
        refine ``( { P := %%p, abs := %%abs_fn, repr' := %%repr_fn, .. } ),
        solve1 $ prove_abs_repr func,
-       solve1 $ admit },
+       solve1 $ prove_abs_map func },
    df ← instantiate_mvars df >>= lambdas dead_params,
    mvqpf_t ← pis dead_params mvqpf_t,
    let inst_n := func.def_name <.> "mvqpf",
@@ -700,6 +760,7 @@ do d ← inductive_decl.parse meta_info,
    mk_pfunctor func,
    trace_error $ mk_pfunc_constr func,
    trace_error $ mk_pfunc_recursor func,
+   trace_error $ mk_pfunc_rec_eqns func,
    -- mk_pfunc_map func,
    -- mk_pfunc_mvfunctor_instance func,
    trace_error $ mk_mvqpf_instance func,

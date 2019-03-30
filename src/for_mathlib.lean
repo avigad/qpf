@@ -579,10 +579,10 @@ meta def simp_lemmas.append_pexprs : simp_lemmas → list name → list pexpr �
 | s u (l::ls) := do (s, u) ← simp_lemmas.add_pexpr s u l, simp_lemmas.append_pexprs s u ls
 
 
-meta def simp_only (ls : list pexpr) : tactic unit :=
+meta def simp_only (ls : list pexpr) (attrs : list name := []) : tactic unit :=
 do let ls := ls.map (simp_arg_type.expr), -- >>= simp_lemmas.append_pexprs simp_lemmas.mk [],
    -- interactive.dsimp tt ls [] (interactive.loc.ns [none])
-   interactive.simp none tt ls [] (interactive.loc.ns [none])
+   interactive.simp none tt ls attrs (interactive.loc.ns [none])
 
 meta def mk_substitution (vs : list expr) : tactic (list expr × list (name × expr)) :=
 do vs' ← intron' vs.length,
