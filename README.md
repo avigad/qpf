@@ -21,3 +21,5 @@ This will install a local copy of the [mathlib](https://github.com/leanprover-co
 If you want to browse the files with interactive feedback from Lean, we recommend using [Visual Studio Code](https://code.visualstudio.com/) and installing the Lean extension via the extension manager.
 
 There are variations. For instructions that install `elan`, a system which will manage versions of Lean for you automatically, see [here](https://github.com/leanprover-community/mathlib/blob/master/docs/elan.md). You can also install `mathlib` via binaries, following the directions in the README file [here](https://github.com/leanprover-community/mathlib).
+
+To test the data type compiler, see the [test/README.md](test/README.md).
