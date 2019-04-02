@@ -4,7 +4,7 @@
 
 This repository contains a formalization of data type constructions in Lean, by Jeremy Avigad, Mario Carneiro, and Simon Hudon. A preliminary version of the work is described in this talk: [http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf](http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf).
 
-See the `README` file in the `src` folder for a description of the contents.
+See the [src/README.md](src/README.md) for a description of the contents.
 
 The easiest way to test the code is as follows:
 
@@ -22,4 +22,4 @@ If you want to browse the files with interactive feedback from Lean, we recommen
 
 There are variations. For instructions that install `elan`, a system which will manage versions of Lean for you automatically, see [here](https://github.com/leanprover-community/mathlib/blob/master/docs/elan.md). You can also install `mathlib` via binaries, following the directions in the README file [here](https://github.com/leanprover-community/mathlib).
 
-To test the data type compiler, see the [test/README.md](test/README.md).
+To test the data type compiler, see [test/README.md](test/README.md).

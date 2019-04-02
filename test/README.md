@@ -1,5 +1,5 @@
 
-# Testing Data Type Compiler
+# Testing the Data Type Compiler
 
  1. Edit [examples.lean](examples.lean)
  2. Uncomment lines 9 to 22 and lines 28 to 41
