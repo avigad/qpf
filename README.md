@@ -4,7 +4,7 @@
 
 This repository contains a formalization of data type constructions in Lean, by Jeremy Avigad, Mario Carneiro, and Simon Hudon. A preliminary version of the work is described in this talk: [http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf](http://www.andrew.cmu.edu/user/avigad/Talks/qpf.pdf).
 
-See the [src/README.md](src/README.md) for a description of the contents.
+See [src/README.md](src/README.md) for a description of the contents.
 
 The easiest way to test the code is as follows:
 
