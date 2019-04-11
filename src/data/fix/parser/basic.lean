@@ -6,8 +6,6 @@ import category.bitraversable.instances
 
 universes u
 
-lemma foo {n} {p : mvpfunctor n} {v} (C : p.apply v → Sort*) {a : p.A} {f g : p.B a ⟹ v} (h : f = g) (x : C ⟨a,f⟩) : C ⟨a,g⟩ :=
-by cases h; apply x
 
 namespace tactic
 
@@ -78,8 +76,7 @@ meta structure internal_mvfunctor :=
 (params : list expr)
 (type : expr)
 
-meta def mk_inductive' : inductive_type → lean.parser unit
-| decl :=
+meta def inductive_type.to_format (decl : inductive_type) : tactic format :=
 do let n₀ := name.anonymous,
    t ← pis decl.idx decl.type,
    cn ← mk_local_def (decl.name.replace_prefix decl.pre n₀) t,
@@ -93,6 +90,11 @@ do let n₀ := name.anonymous,
    let xs := format!"
 inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
 {format.intercalate \"\n\" brs}",
+   return xs
+
+meta def mk_inductive' : inductive_type → lean.parser unit
+| decl :=
+do xs ← decl.to_format,
    lean.parser.with_input lean.parser.command_like xs.to_string,
    pure ()
 
@@ -828,4 +830,3 @@ do d ← inductive_decl.parse meta_info,
 -- local attribute [user_command]  qpf_decl
 
 end tactic
-

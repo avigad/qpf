@@ -498,7 +498,7 @@ meta def unify_mapp (e : expr) (args : list (option expr)) : tactic expr :=
 do t ← infer_type e >>= whnf,
    unify_mapp_aux e t args
 
-meta def mk_to_string (t : expr) (fn of_string : name) (ls : list expr) (out : expr) : tactic expr :=
+meta def mk_to_string (t : expr) (fn of_string : name) (ls : list expr) (out : expr) (trusted : bool) : tactic expr :=
 do let n := t.get_app_fn.const_name,
    d ← get_decl n,
    let r : reducibility_hints := reducibility_hints.regular 1 tt,
@@ -531,19 +531,19 @@ do let n := t.get_app_fn.const_name,
           pure () end },
    df ← instantiate_mvars df >>= lambdas ls,
    t ← infer_type df,
-   add_decl' $ declaration.defn (n ++ fn) d.univ_params t df r d.is_trusted
+   add_decl' $ declaration.defn (n ++ fn) d.univ_params t df r (trusted ∧ d.is_trusted)
 
 meta def mk_has_to_format : tactic unit :=
 do `(has_to_format %%t) ← target,
    ls ← local_context,
-   e ← mk_to_string t `to_fmt `format.of_string ls `(format),
+   e ← mk_to_string t `to_fmt `format.of_string ls `(format) ff,
    refine ``( { to_format := %%(e.mk_app ls) } ),
    pure ()
 
 meta def mk_has_repr : tactic unit :=
 do `(has_repr %%t) ← target,
    ls ← local_context,
-   e ← mk_to_string t `repr `id ls `(string),
+   e ← mk_to_string t `repr `id ls `(string) tt,
    refine ``( { repr := %%(e.mk_app ls) } ),
    pure ()
 

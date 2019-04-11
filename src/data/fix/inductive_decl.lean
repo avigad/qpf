@@ -17,7 +17,9 @@ meta structure type_cnstr :=
 meta instance : has_to_format type_cnstr :=
 { to_format := λ ⟨n,a,r⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
 
-@[derive [has_reflect,has_to_format]]
+attribute [derive has_to_format] binder_info
+
+-- @[derive [has_reflect,has_to_format]]
 meta structure inductive_type :=
 (pre : name)
 (name : name)
@@ -27,8 +29,8 @@ meta structure inductive_type :=
 (type : expr)
 (ctors : list type_cnstr)
 
-meta instance inductive_type.has_to_tactic_format : has_to_tactic_format inductive_type :=
-{ to_tactic_format := λ a, pure $ to_fmt a }
+-- meta instance inductive_type.has_to_tactic_format : has_to_tactic_format inductive_type :=
+-- { to_tactic_format := λ a, pure $ to_fmt a }
 
 meta def inductive_type.u_params (decl : inductive_type) :=
 decl.u_names.map level.param
@@ -216,5 +218,18 @@ do d ← decl.decls.nth 0,
           params := decl.params,
           idx := idx, type := t,
           ctors := cs.map prod.snd }
+
+meta def local_ctor (n : name) : expr → expr :=
+local_const n n binder_info.default
+
+meta def inductive_type.type_ctor (decl : inductive_type) : expr :=
+(@const tt decl.name decl.u_params).mk_app decl.params
+
+meta def inductive_type.sig (decl : inductive_type) : tactic expr :=
+local_ctor decl.name <$> pis decl.idx decl.type
+
+meta def inductive_type.intros (decl : inductive_type) : tactic (list expr) :=
+do let t := inductive_type.type_ctor decl,
+   decl.ctors.mmap $ λ c, local_ctor c.name <$> pis c.args (t.mk_app c.result)
 
 end tactic

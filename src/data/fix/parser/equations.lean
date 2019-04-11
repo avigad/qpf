@@ -234,6 +234,39 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    add_decl $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
    skip
 
+meta def mk_bisim_rel (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
+   let n := d.induct.name <.> "bisim_rel",
+   let decl := d.induct,
+   let type_ctor := (@const tt n decl.u_params).mk_app decl.params,
+   cs ← d.induct.ctors.mmap $ λ c,
+   do { args ← c.args.mmap $ λ e,
+             if t.occurs e then renew e
+                           else pure e,
+        let (xs,ys) := c.args.partition $ λ e, t.occurs e,
+        let xs' := args.filter $ λ e, t.occurs e,
+        co_ind ← mzip_with (λ x x' : expr,
+        do (args,t) ← infer_type x >>= mk_local_pis,
+           pis args (type_ctor (x.mk_app args) (x'.mk_app args)) >>= mk_local_def `h ) xs xs',
+        let x  := (@const tt c.name d.induct.u_params).mk_app $ d.params ++ c.args,
+        let x' := (@const tt c.name d.induct.u_params).mk_app $ d.params ++ args,
+        return ({ name := c.name.update_prefix n,
+                  args := ys ++ xs ++ xs' ++ co_ind,
+                  result := [x,x'] } : type_cnstr) },
+   x ← mk_local_def `x t,
+   y ← mk_local_def `y t,
+   let decl : inductive_type :=
+            { pre := d.induct.pre,
+              name := n,
+              u_names := d.induct.u_names,
+              params := d.induct.params,
+              idx := [x,y],
+              type := `(Prop),
+              ctors := cs },
+   sig ← decl.sig,
+   intros ← decl.intros,
+   add_coinductive_predicate decl.u_names decl.params [(sig,intros)]
+
 meta def mk_fix_functor_instance (func : internal_mvfunctor) : tactic unit :=
 do let params := func.dead_params.map prod.fst,
    let c := (@const tt func.def_name func.induct.u_params).mk_app params,
@@ -282,6 +315,7 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
    trace_error $ mk_corecursor func d,
    trace_error $ mk_cofix_functor_instance d,
+   trace_error $ mk_bisim_rel func d,
    trace_error $ mk_bisim func d,
    pure ()
 
