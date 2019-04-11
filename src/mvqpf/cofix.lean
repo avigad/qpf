@@ -70,6 +70,15 @@ quot.lift
         ←append_fun_comp_id] }
   end
 
+def cofix.corec' {α : typevec n} {β : Type u} (g : β → F (α.append1 (cofix F α ⊕ β))) (x : β) : cofix F α :=
+cofix.corec
+(λ x : cofix F α ⊕ β,
+match x with
+| (sum.inl val) := (id ::: sum.inl) <$$> cofix.dest val
+| (sum.inr val) := g val
+end)
+(sum.inr x)
+
 theorem cofix.dest_corec {α : typevec n} {β : Type u} (g : β → F (α.append1 β)) (x : β) :
   cofix.dest (cofix.corec g x) = append_fun id (cofix.corec g) <$$> g x :=
 begin

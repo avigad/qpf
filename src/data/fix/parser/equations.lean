@@ -125,17 +125,20 @@ do let u := fresh_univ d.induct.u_names,
    let shape_n := n <.> "shape",
    let internal_eq_n := shape_n <.> "internal_eq",
    let t' := (@const tt (shape_n <.> "internal") d.induct.u_params).mk_app $ func.dead_params.map prod.fst,
-   let ft := imp x $ (@const tt shape_n u_params).mk_app $ func.params,
    let intl_eq := (@const tt internal_eq_n u_params).mk_app $ d.params,
-   fn ← mk_local_def `f ft,
-   i ← mk_local_def `i x,
-   fn' ← mk_eq_mpr (intl_eq x) (fn i) >>= lambdas [i],
-   df' ← mk_mapp ``mvqpf.cofix.corec [none,t',none,none,v,x],
-   df ← mk_mapp ``mvqpf.cofix.corec [none,t',none,none,v,x,fn'],
-   let t := imp x $ (@const tt n u_params).mk_app d.params,
-   t ← pis (d.params ++ [x,fn]) t,
-   df ← lambdas (d.params ++ [x,fn]) df,
-   add_decl $ mk_definition (n <.> "corec") (u :: d.induct.u_names) t df,
+   let my_fun (rec_n rec_n' : name) (a : expr) := do
+   { let ft := imp x $ (@const tt shape_n u_params).mk_app $ d.params ++ [a],
+     fn ← mk_local_def `f ft,
+     i  ← mk_local_def `i x,
+     fn' ← mk_eq_mpr (intl_eq a) (fn i) >>= lambdas [i],
+     df ← mk_mapp rec_n [none,t',none,none,v,x,fn'],
+     let t := imp x $ (@const tt n u_params).mk_app d.params,
+     t ← pis (d.params ++ [x,fn]) t,
+     df ← lambdas (d.params ++ [x,fn]) df,
+     add_decl $ mk_definition rec_n' (u :: d.induct.u_names) t df },
+   x' ← mk_mapp ``sum [t,x],
+   my_fun ``mvqpf.cofix.corec' (n <.> "corec'") x',
+   my_fun ``mvqpf.cofix.corec (n <.> "corec") x,
    pure ()
 
 meta def parse_conjunction_aux : (expr → expr) → expr → expr → dlist expr
@@ -283,4 +286,3 @@ do d ← inductive_decl.parse meta_info,
    pure ()
 
 end tactic
-

@@ -39,4 +39,5 @@ codata tree' (α β : Type)
 -- #check tree'.cons
 -- #check @tree'.cases_on
 -- #check @tree'.corec
+-- #check @tree'.corec'
 -- #check @tree'.bisim
