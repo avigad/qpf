@@ -156,10 +156,14 @@ meta def mk_live_vec (u : level) (vs : list expr) : tactic expr :=
 do nil ← mk_mapp ``fin'.elim0 [@expr.sort tt $ level.succ u],
    vs.reverse.mfoldr (λ e s, mk_mapp ``typevec.append1 [none,s,e]) nil
 
-meta def mk_map_vec (u : level) (vs : list expr) : tactic expr :=
-do let nil := @expr.const tt ``typevec.nil_fun [u,u],
-   vs.reverse.mfoldr (λ e s,
-     mk_mapp ``typevec.append_fun [none,none,none,none,none,s,e]) nil
+meta def mk_map_vec (u u' : level) (vs : list expr) : tactic expr :=
+do nil  ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
+   nil' ← mk_mapp ``fin'.elim0 [some $ expr.sort u'.succ], --  [u.succ.succ] (expr.sort u.succ),
+   nil_fun ← mk_mapp ``typevec.nil_fun [nil,nil'],
+   vs.reverse.mfoldr (λ e s, do
+     app ← mk_const ``typevec.append_fun,
+     mk_mapp ``typevec.append_fun [none,none,none,none,none,s,e]) nil_fun
+
 
 meta def mk_internal_functor_app (func : internal_mvfunctor) : tactic expr :=
 do let decl := func.decl,
@@ -268,14 +272,16 @@ do env ← get_env,
        vs' ← vs.mmap (map_arg m),
        α ← mk_live_vec func.vec_lvl (mk_arg_list func.live_params),
        β ← mk_live_vec func.vec_lvl (mk_arg_list live_params'),
-       f ← mk_map_vec func.vec_lvl $ fs.map prod.snd,
+       f ← mk_map_vec func.vec_lvl func.vec_lvl $ fs.map prod.snd,
        let x := e.mk_app vs,
        let map_e := (@expr.const tt func.map_name func.decl.univ_levels).mk_app (mk_arg_list func.dead_params ++ [α,β,f,x]),
-       eqn ← mk_app `eq [map_e,(e'.mk_app vs')] >>= pis (func.params ++ live_params'.map prod.fst ++ fs.map prod.snd ++ vs),
+       eqn ← mk_app `eq [map_e,(e'.mk_app vs')] >>= pis (func.params ++ live_params'.map prod.fst ++ fs.map prod.snd ++ vs) >>= instantiate_mvars,
        (_,pr) ← solve_aux eqn $ do
          { intros >> reflexivity },
        pr ← instantiate_mvars pr,
-       add_decl $ declaration.thm (func.map_name <.> ("_equation_" ++ to_string i)) decl.univ_params eqn (pure pr),
+       let n := func.map_name <.> ("_equation_" ++ to_string i),
+       add_decl $ declaration.thm n decl.univ_params eqn (pure pr),
+       simp_attr.typevec.set n () tt,
        pure () }
 
 meta def mk_mvfunctor_instance (func : internal_mvfunctor) : tactic unit :=
@@ -460,7 +466,7 @@ do env ← get_env,
                      pr ← mk_eq_refl e,
                      pure $ f.mk_app $ vs' ++ rec ++ [e,pr] },
           (_,df) ← solve_aux r $ do
-            { m ← mk_map_vec func.vec_lvl ms,
+            { m ← mk_map_vec func.vec_lvl func.vec_lvl ms,
               refine ``( ⟨ %%e, _ ⟩ ),
               exact m,
               pure () },
@@ -561,7 +567,7 @@ do let u := fresh_univ func.induct.u_names,
               set_goals [g],
               ⟨n,xs,[(_,n_snd)]⟩ ← pure (v : name × list expr × list (name × expr)),
               fs ← destruct_multimap n_snd,
-              n_snd ← mk_map_vec func.vec_lvl fs,
+              n_snd ← mk_map_vec func.vec_lvl func.vec_lvl fs,
               let child_n := c.name.update_prefix $ func.induct.name <.> "child_t",
               let subst := (func.live_params.map prod.fst).zip fs,
               h_args ← zip_vars child_n func.induct.u_params (dead_params ++ xs) xs subst c.args,
@@ -659,7 +665,7 @@ open bitraversable
 meta def mk_pfunctor_map_eqn (func : internal_mvfunctor) : tactic unit :=
 do β ← func.live_params.mmap $ tfst renew,
    fs ← mzip_with (λ x y : expr × _, mk_local_def `f $ x.1.imp y.1) func.live_params β,
-   vf ← mk_map_vec func.vec_lvl fs,
+   vf ← mk_map_vec func.vec_lvl func.vec_lvl fs,
    let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
    let params' := (rb_map.sort prod.snd $ func.dead_params ++ β).map prod.fst,
    cs.mmap' $ λ cn,
@@ -735,6 +741,74 @@ do let n := func.live_params.length,
    add_decl $ mk_definition inst_n func.induct.u_names mvqpf_t df,
    set_basic_attribute `instance inst_n
 
+meta def mk_conj : list expr → expr
+| [] := `(true)
+| [x] := x
+| (x :: xs) := @const tt ``and [] x (mk_conj xs)
+
+def list.lookup {α β} [decidable_eq α] (a : α) : list (α × β) → option β
+| []             := none
+| (⟨a', b⟩ :: l) := if h : a' = a then some b else list.lookup l
+
+meta def replace_all (e : expr) (σ : list (expr × expr)) : expr :=
+expr.replace e $ λ x _, list.lookup x σ
+
+meta def mk_liftp_eqns (func : internal_mvfunctor) : tactic unit :=
+do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.params,
+   let F := (@const tt func.def_name func.induct.u_params).mk_app $ func.dead_params.map prod.fst,
+   let internal_eq := (@const tt func.eqn_name func.induct.u_params).mk_app func.params,
+   x ← mk_local_def `x my_t,
+   x' ← mk_eq_mpr internal_eq x,
+   let live_params := func.live_params.map prod.fst,
+   v ← mk_live_vec func.vec_lvl live_params,
+   fs ← live_params.mmap $ λ v, mk_local_def `f $ v.imp `(Prop),
+   let m := rb_map.of_list $ list.zip live_params fs,
+   fv ← mk_map_vec func.vec_lvl level.zero fs,
+   fv_map ← fs.mmap (λ f, mk_mapp ``subtype.val [none,f]) >>= mk_map_vec func.vec_lvl func.vec_lvl,
+   fv_t ← fs.mmap (λ f, mk_mapp ``subtype [none,f]) >>= mk_live_vec func.vec_lvl,
+
+   df ← mk_mapp ``typevec.liftp' [none,F,none,v,fv],
+   func.induct.ctors.mmap $ λ c, do
+   { let e := (@const tt c.name func.induct.u_params).mk_app $ func.params ++ c.args,
+     x' ← mk_eq_mpr internal_eq e,
+     args ← c.args.mmap $ λ arg, do
+       { (args,rhs_t) ← infer_type arg >>= mk_local_pis,
+         (some f) ← pure $ m.find rhs_t | pure [],
+         list.ret <$> pis args (f $ arg.mk_app args) },
+     let rhs := mk_conj args.join,
+     t ← pis (c.args.map to_implicit) $ (df x').imp rhs,
+     (_,df) ← solve_aux t $ do
+     { solve1 $ do
+       { args ← intron' c.args.length,
+         mk_const ``typevec.liftp_def >>= rewrite_target,
+         dunfold_target [``mvfunctor.map],
+         h ← intro `h,
+         t ← infer_type h,
+         let n := func.live_params.length,
+         x ← mk_mapp ``subtype_ [`(n),none,fv],
+         y ← mk_mapp ``typevec.subtype_val [`(n),none,fv],
+         h' ← assertv `h' (replace_all t [(x,fv_t),(y,fv_map)]) h, clear h,
+         [(_,[x,y],_)] ← cases_core h',
+         hs ← cases_core x,
+         gs ← get_goals,
+         gs ← (gs.zip hs.enum).mmap $ λ ⟨g,i,n,x,b⟩,
+         do { set_goals [g],
+              eqn ← mk_const $ (func.induct.name ++ `internal.map._equation).append_after i,
+              h' ← rewrite_hyp eqn (y.instantiate_locals b) { md := semireducible },
+              t ← target,
+              cases h',
+              get_goals },
+         set_goals gs.join,
+         repeat $ do { split, intros, applyc ``subtype.property },
+         intros, applyc ``subtype.property <|> interactive.trivial,
+         done },
+       done },
+     t ← pis ((func.params ++ fs).map to_implicit) t,
+     df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
+     add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t (pure df) },
+
+   skip
+
 open interactive lean.parser lean
 
 @[user_command]
@@ -754,3 +828,4 @@ do d ← inductive_decl.parse meta_info,
 -- local attribute [user_command]  qpf_decl
 
 end tactic
+

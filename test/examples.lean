@@ -19,6 +19,7 @@ data tree (α β : Type)
 -- #check tree.cons
 -- #check @tree.cases_on
 -- #check @tree.rec
+-- #check @tree.ind
 -- #check @tree.drec
 
 codata tree' (α β : Type)

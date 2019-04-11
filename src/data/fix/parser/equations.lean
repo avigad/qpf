@@ -138,6 +138,80 @@ do let u := fresh_univ d.induct.u_names,
    add_decl $ mk_definition (n <.> "corec") (u :: d.induct.u_names) t df,
    pure ()
 
+meta def parse_conjunction_aux : (expr → expr) → expr → expr → dlist expr
+| ρ `(true) e := dlist.empty
+| ρ `(%%p ∧ %%q) e := parse_conjunction_aux (λ e, @const tt ``and.elim_left [] p q (ρ e)) p e ++ parse_conjunction_aux (λ e, @const tt ``and.elim_right [] p q (ρ e)) q e
+| ρ _ e := dlist.singleton $ ρ e
+
+meta def parse_conjunction (e : expr) : tactic $ list expr :=
+do t ← infer_type e >>= instantiate_mvars,
+   return (parse_conjunction_aux id t e).to_list
+
+meta def mk_ind (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   let my_t := (@const tt (d.induct.name) d.induct.u_params).mk_app d.params,
+   let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app $ d.params,
+   v' ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst,
+   v ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst ++ [my_t],
+   yy ← mk_local_def `y (my_shape_intl_t v),
+   x ← mk_local_def `x my_t,
+   p ← mk_local_def `p (my_t.imp `(Prop)),
+   let eqn := (@const tt (func.eqn_name) d.induct.u_params).mk_app d.params my_t,
+   a ← mk_mapp ``typevec.pred_last [none,v',none,p],
+   liftp ← mk_const ``mvfunctor.liftp,
+   unify_mapp liftp [none,my_shape_intl_t,none],
+   b ← unify_mapp liftp [none,my_shape_intl_t,none,none,a,yy] >>= mk_local_def `a,
+   mk_y ← mk_app ``mvqpf.fix.mk [yy],
+   branches ← d.induct.ctors.mmap $ λ c,
+     do { let c_t := (@const tt c.name d.induct.u_params).mk_app d.params,
+          (args,_) ← infer_type c_t >>= mk_local_pis,
+          ih ← args.mmap $ λ x,
+            do { t ← infer_type x,
+                 if my_t.occurs t then do
+                   (xs,_) ← mk_local_pis t,
+                   v ← pis xs (p $ x.mk_app xs) >>= mk_local_def `v,
+                   pure [v]
+                 else pure [] },
+          b ← pis (args ++ ih.join) (p $ c_t.mk_app args) >>= mk_local_def `a,
+          pure (c,ih,b) },
+   ht ← pis [yy,b] (p mk_y),
+   (_,h) ← solve_aux ht $ do
+   { y ← intro1,
+     y' ← mk_eq_mp eqn y,
+     generalize_with `h `y' y',
+     C ← mk_motive, y' ← intro `y',
+     cases_fn ← mk_const (d.induct.name <.> "shape" <.> "cases_on"),
+     gs ← list.mrepeat d.induct.ctors.length mk_mvar,
+     unify_app cases_fn (d.params ++ [my_t,C,y'] ++ gs) >>= exact,
+     set_goals gs,
+     branches.mmap $ λ ⟨c,ih,b⟩,
+       solve1 $ do
+       { let _a : type_cnstr := c,
+         args ← intron' c.args.length,
+         h ← intro1,
+         h' ← mk_app ``eq_mpr_of_mp_eq [h] >>= rewrite_target,
+         ih ← intro1,
+         v ← mk_mvar, v' ← mk_mvar,
+         thm ← mk_const ``typevec.liftp_last_pred_iff,
+         thm ← unify_app' thm [v',v],
+         mpr ← mk_const ``iff.mpr,
+         ih ← (unify_app' mpr [thm,ih] >>= instantiate_mvars >>= note ih.local_pp_name none) <* clear ih,
+         simp_only [``(typevec.pred_last'),``(typevec.const_append1),``(typevec.const_nil),``(typevec.subtype_val_append1),``(typevec.subtype_val_nil)] [] (some ih.local_pp_name),
+         let n := (c.name.update_prefix $ c.name.get_prefix <.> "shape").append_suffix "_liftp",
+         n' ← mk_const n,
+         ih ← get_local ih.local_pp_name,
+         ih ← (unify_app' n' [ih] >>= note ih.local_pp_name none) <* clear ih,
+         p_args ← parse_conjunction ih,
+         exact $ b.mk_app $ args ++ p_args,
+         done },
+     done },
+   ind ← mk_const ``mvqpf.fix.ind,
+   df ← unify_mapp ind [none,my_shape_intl_t,none,none,v',p,h,x] >>= instantiate_mvars,
+   df ← lambdas (d.params.map to_implicit ++ to_implicit p :: branches.map (prod.snd ∘ prod.snd) ++ [x]) df,
+   t ← infer_type df,
+   add_decl $ declaration.thm (d.induct.name <.> "ind") d.induct.u_names t (pure df),
+   skip
+
 meta def mk_bisim (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
    let my_t := (@const tt (d.induct.name) d.induct.u_params).mk_app d.params,
@@ -187,17 +261,20 @@ do let params := func.dead_params.map prod.fst,
 meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.fix d,
+   trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
    trace_error $ mk_recursor func d,
    trace_error $ mk_dep_recursor func d,
    trace_error $ mk_fix_functor_instance d,
+   trace_error $ mk_ind func d,
    pure ()
 
 @[user_command]
 meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.cofix d,
+   trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
    trace_error $ mk_constr ``mvqpf.cofix.mk d,
    trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
    trace_error $ mk_corecursor func d,
@@ -206,3 +283,4 @@ do d ← inductive_decl.parse meta_info,
    pure ()
 
 end tactic
+

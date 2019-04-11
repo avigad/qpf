@@ -7,11 +7,11 @@ namespace tactic
 
 open interactive lean lean.parser
 
-meta def foo (n : expr) (v : expr) : type_cnstr → type_cnstr
+meta def replace_rec_occ (tn tn' : name) (nested : expr) (var : expr) : type_cnstr → type_cnstr
 | (tactic.type_cnstr.mk name args result) :=
-{ name := name,
-  args := args.map $ λ e, expr.replace e $ λ e' _, if e' = n then pure v else none,
-  result := result.map $ λ e, expr.replace e $ λ e' _, if e' = n then pure v else none }
+{ name := name.replace_prefix tn tn',
+  args := args.map $ λ e, expr.replace e $ λ e' _, if e' = nested then pure var else none,
+  result := result.map $ λ e, expr.replace e $ λ e' _, if e' = nested then pure var else none }
 
 open expr interactive
 
@@ -28,7 +28,7 @@ do v ← mk_local_def (fresh_univ (d.params.map expr.local_pp_name) `α) d.type,
               params := d.params ++ [v],
               idx := d.idx,
               type := d.type,
-              ctors := d.ctors.map (foo c' v) })
+              ctors := d.ctors.map (replace_rec_occ d.name (d.name <.> "shape") c' v) })
 
 meta def mk_shape_functor' (d : interactive.inductive_decl) : lean.parser (datatype_shape × internal_mvfunctor) :=
 do d ← inductive_type.of_decl d,

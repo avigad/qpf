@@ -59,6 +59,10 @@ def mzip_with₄ {α β γ φ ψ} (f : α → β → γ → φ → m ψ) :
 
 -- def mmap_enum_if {α} (p : α → Prop) [decidable_pred p] (f : ℕ → α → m α) : list α → m (list α) :=
 -- mmap_enum_if' p f 0
+open nat
+def mrepeat {α} : ℕ → m α → m (list α)
+| 0        cmd := pure []
+| (succ n) cmd := (::) <$> cmd <*> mrepeat n cmd
 
 end list
 namespace roption
@@ -449,6 +453,30 @@ meta def unify_app (e : expr) (args : list expr) : tactic expr :=
 do t ← infer_type e >>= whnf,
    unify_app_aux e t args
 
+meta def unify_app_aux' : expr → expr → list expr → tactic expr
+| e (pi _ binder_info.default d b) (a :: as) :=
+do t ← infer_type a,
+   unify t d,
+   e' ← head_beta (e a),
+   b' ← whnf (b.instantiate_var a),
+   unify_app_aux' e' b' as
+| e (pi _ binder_info.inst_implicit d b) as :=
+do v ← mk_instance d <|> mk_meta_var d,
+   e' ← head_beta (e v),
+   b' ← whnf (b.instantiate_var v),
+   unify_app_aux' e' b' as
+| e (pi _ _ d b) as :=
+do v ← mk_meta_var d,
+   e' ← head_beta (e v),
+   b' ← whnf (b.instantiate_var v),
+   unify_app_aux' e' b' as
+| e t (_ :: _) := fail "too many arguments"
+| e _ [] := pure e
+
+meta def unify_app' (e : expr) (args : list expr) : tactic expr :=
+do t ← infer_type e >>= whnf,
+   unify_app_aux' e t args
+
 meta def unify_mapp_aux : expr → expr → list (option expr) → tactic expr
 | e (pi _ _ d b) (none :: as) :=
 do a ← mk_mvar,
@@ -579,15 +607,31 @@ meta def simp_lemmas.append_pexprs : simp_lemmas → list name → list pexpr �
 | s u (l::ls) := do (s, u) ← simp_lemmas.add_pexpr s u l, simp_lemmas.append_pexprs s u ls
 
 
-meta def simp_only (ls : list pexpr) (attrs : list name := []) : tactic unit :=
+meta def simp_only (ls : list pexpr) (attrs : list name := []) (loc : option name := none) : tactic unit :=
 do let ls := ls.map (simp_arg_type.expr), -- >>= simp_lemmas.append_pexprs simp_lemmas.mk [],
    -- interactive.dsimp tt ls [] (interactive.loc.ns [none])
-   interactive.simp none tt ls attrs (interactive.loc.ns [none])
+   interactive.simp none tt ls attrs (interactive.loc.ns [loc])
 
 meta def mk_substitution (vs : list expr) : tactic (list expr × list (name × expr)) :=
 do vs' ← intron' vs.length,
    let σ := (vs.map expr.local_uniq_name).zip vs',
    pure (vs', σ)
+
+meta def generalize_with (h x : name) (e : expr) : tactic unit :=
+do t ← infer_type e,
+   v ← mk_local_def x t,
+   h ← mk_app `eq [e,v] >>= mk_local_def h,
+   tgt ← target,
+   (tgt',_) ← solve_aux tgt $ do
+   { generalize e,
+     pi _ _ _ e' ← target,
+     pure $ e'.instantiate_var v } <|> pure tgt,
+   tgt' ← pis [v,h] tgt',
+   new_goal ← mk_meta_var tgt',
+   heq ← mk_eq_refl e,
+   exact $ new_goal e heq,
+   gs ← get_goals, set_goals $ new_goal :: gs
+
 open interactive.types interactive lean.parser
 
 @[user_command]
@@ -697,3 +741,9 @@ meta def stack_trace : vm_monitor ℕ :=
 
 lemma mpr_mpr : Π {α β} (h : α = β) (h' : β = α) (x : α), h.mpr (h'.mpr x) = x
 | _ _ rfl rfl x := rfl
+
+lemma eq_mpr_of_mp_eq : Π {α β} {h : α = β} {x : α} {y : β} (h' : h.mp x = y), x = h.mpr y
+| _ _ rfl _ _ := id
+
+lemma mp_eq_of_eq_mpr : Π {α β} {h : α = β} {x : α} {y : β} (h' : x = h.mpr y), h.mp x = y
+| _ _ rfl _ _ := id
