@@ -61,15 +61,18 @@ do let dead := func.dead_params.map prod.fst,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()
 
+meta def timetac' {α : Type*} (_ : string) (tac : thunk (tactic α)) : tactic α :=
+tac ()
+
 meta def mk_datatype (iter : name) (d : inductive_decl) : tactic (datatype_shape × internal_mvfunctor) :=
 do (func', d) ← mk_shape_functor' d,
    let func : internal_mvfunctor := { .. func' },
-   mk_mvfunctor_instance func,
+   timetac' "mk_mvfunctor_instance" $ mk_mvfunctor_instance func,
    mk_pfunctor func,
-   mk_pfunc_constr func,
-   mk_pfunc_recursor func,
-   mk_mvqpf_instance func,
-   mk_fixpoint iter func d,
+   timetac' "mk_pfunc_constr" $ mk_pfunc_constr func,
+   timetac' "mk_pfunc_recursor" $ mk_pfunc_recursor func,
+   timetac' "mk_mvqpf_instance" $ mk_mvqpf_instance func,
+   timetac' "mk_fixpoint" $ mk_fixpoint iter func d,
    pure (func',d)
 
 end tactic

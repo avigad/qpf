@@ -278,7 +278,8 @@ do env ← get_env,
        pr ← solve_async [] eqn $ do
          { intros >> reflexivity },
        let n := func.map_name <.> ("_equation_" ++ to_string i),
-       add_decl $ declaration.thm n decl.univ_params eqn pr,
+       d ← add_decl' $ declaration.thm n decl.univ_params eqn pr,
+       trace_expr d,
        simp_attr.typevec.set n () tt,
        pure () }
 
@@ -658,7 +659,8 @@ do β ← func.live_params.mmap $ tfst renew,
    let cs := func.induct.ctors.map $ λ c : type_cnstr, c.name.update_prefix func.pfunctor_name,
    let params' := (rb_map.sort prod.snd $ func.dead_params ++ β).map prod.fst,
    cs.mmap' $ λ cn,
-     do { let c := (@const tt cn func.induct.u_params).mk_app func.params,
+     do { trace cn,
+          let c := (@const tt cn func.induct.u_params).mk_app func.params,
           let c' := (@const tt cn func.induct.u_params).mk_app params',
           (vs,_) ← infer_type c >>= mk_local_pis,
           lhs ← mk_app ``mvfunctor.map [vf,c.mk_app vs],
@@ -753,8 +755,11 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
    fv ← mk_map_vec func.vec_lvl level.zero fs,
    fv_map ← fs.mmap (λ f, mk_mapp ``subtype.val [none,f]) >>= mk_map_vec func.vec_lvl func.vec_lvl,
    fv_t ← fs.mmap (λ f, mk_mapp ``subtype [none,f]) >>= mk_live_vec func.vec_lvl,
-
-   df ← mk_mapp ``typevec.liftp' [none,F,none,v,fv],
+   -- trace_expr v, trace_expr F, trace fv,
+   let n := func.live_params.length,
+   -- mk_const ``typevec.liftp' >>= trace_expr,
+   df ← mk_mapp ``typevec.liftp' [`(n),F,none,v,fv],
+   -- trace " - here - ",
    func.induct.ctors.mmap $ λ c, do
    { let e := (@const tt c.name func.induct.u_params).mk_app' [func.params, c.args],
      x' ← mk_eq_mpr internal_eq e,
@@ -791,7 +796,83 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
          done },
        done },
      t ← pis ((func.params ++ fs).map to_implicit) t,
+     trace t,
+     df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
      add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t df },
+
+   skip
+#check @typevec.liftr'
+meta def mk_liftr_eqns (func : internal_mvfunctor) : tactic unit :=
+do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.params,
+   let F := (@const tt func.def_name func.induct.u_params).mk_app $ func.dead_params.map prod.fst,
+   let internal_eq := (@const tt func.eqn_name func.induct.u_params).mk_app func.params,
+   x ← mk_local_def `x my_t,
+   x' ← mk_eq_mpr internal_eq x,
+   let live_params := func.live_params.map prod.fst,
+   v ← mk_live_vec func.vec_lvl live_params,
+   fs ← live_params.mmap $ λ v,
+     do { v ← mk_local_def `f $ v.imp $ v.imp `(Prop),
+          mk_mapp ``function.uncurry [none,none,none,v] },
+   let m := rb_map.of_list $ list.zip live_params fs,
+   fv ← mk_map_vec func.vec_lvl level.zero fs,
+   fv_map ← fs.mmap (λ f, mk_mapp ``subtype.val [none,f]) >>= mk_map_vec func.vec_lvl func.vec_lvl,
+   fv_t ← fs.mmap (λ f, mk_mapp ``subtype [none,f]) >>= mk_live_vec func.vec_lvl,
+   -- trace_expr v, trace_expr F, trace fv,
+   let n := func.live_params.length,
+   -- mk_const ``typevec.liftp' >>= trace_expr,
+   -- trace_expr v, trace_expr fv,
+   df ← mk_mapp ``typevec.liftr' [`(n),F,none,v] >>= trace_expr,
+   let df := df fv,
+   -- unify_app df [fv] >>= trace_expr,
+   -- df ← mk_mapp ``typevec.liftr' [`(n),F,none,v,fv],
+   -- trace " - here - ",
+   func.induct.ctors.mmap $ λ c, do
+   { args ← c.args.mmap renew,
+     let e₀ := (@const tt c.name func.induct.u_params).mk_app $ func.params ++ c.args,
+     let e₁ := (@const tt c.name func.induct.u_params).mk_app $ func.params ++ args,
+     x₀ ← mk_eq_mpr internal_eq e₀,
+     x₁ ← mk_eq_mpr internal_eq e₁,
+     trace "•",
+     args' ← mzip_with (λ arg₀ arg₁ : expr, do
+       { (args,rhs_t) ← infer_type arg₀ >>= mk_local_pis,
+         (some f) ← pure $ m.find rhs_t | pure [],
+         list.ret <$> pis args (f (arg₀.mk_app args) (arg₁.mk_app args) ) } ) c.args args,
+     trace "•",
+     let rhs := mk_conj args'.join,
+     t ← pis ((c.args ++ args).map to_implicit) $ rhs.imp (df x₀ x₁),
+     trace t,
+     (_,df) ← solve_aux t $ do
+     { solve1 $ do
+       { args ← intron' c.args.length,
+         mk_const ``typevec.liftr_def >>= rewrite_target,
+         dunfold_target [``mvfunctor.map],
+         h ← intro `h,
+         t ← infer_type h,
+         let n := func.live_params.length,
+         x ← mk_mapp ``subtype_ [`(n),none,fv],
+         trace_state, done,
+         -- y ← mk_mapp ``typevec.subtype_val [`(n),none,fv],
+         -- h' ← assertv `h' (replace_all t [(x,fv_t),(y,fv_map)]) h, clear h,
+         -- [(_,[x,y],_)] ← cases_core h',
+         -- hs ← cases_core x,
+         -- gs ← get_goals,
+         -- gs ← (gs.zip hs.enum).mmap $ λ ⟨g,i,n,x,b⟩,
+         -- do { set_goals [g],
+         --      eqn ← mk_const $ (func.induct.name ++ `internal.map._equation).append_after i,
+         --      h' ← rewrite_hyp eqn (y.instantiate_locals b) { md := semireducible },
+         --      t ← target,
+         --      cases h',
+         --      get_goals },
+         -- set_goals gs.join,
+         -- repeat $ do { split, intros, applyc ``subtype.property },
+         -- intros, applyc ``subtype.property <|> interactive.trivial,
+         done },
+       done },
+     t ← pis ((func.params ++ fs).map to_implicit) t,
+     trace t,
+     df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
+     add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t (pure df) },
+
    skip
 
 open interactive lean.parser lean
@@ -804,10 +885,20 @@ meta def qpf_attribute : user_attribute :=
 do func ← mk_internal_functor n,
    mk_mvfunctor_instance func,
    mk_pfunctor func,
-   mk_pfunc_constr func,
-   mk_pfunc_recursor func,
-   mk_mvqpf_instance func,
+   trace_error $ mk_pfunc_constr func,
+   trace_error $ mk_pfunc_recursor func,
+   -- trace_error $ mk_pfunc_rec_eqns func,
+   -- mk_pfunc_map func,
+   -- mk_pfunc_mvfunctor_instance func,
+   trace_error $ mk_mvqpf_instance func,
+   trace_error $ mk_liftr_eqns func,
+   -- mk_liftp_eqns func,
    pure ()
  }
 
 end tactic
+
+set_option trace.app_builder true
+qpf tree' (α β : Type)
+| nil : tree'
+| cons : α → (β → α) → tree'
