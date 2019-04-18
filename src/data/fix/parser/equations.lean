@@ -228,17 +228,50 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    hr ← mk_local_def `a (r x y),
    R ← mk_app ``mvfunctor.liftr [r',x',y'],
    f ← pis [x,y,hr] R >>= mk_local_def `f,
+   trace_expr f,
    df ← mk_mapp ``mvqpf.cofix.bisim [none,my_shape_intl_t,none,none,v',r,f,x,y,hr]
       >>= lambdas (d.params ++ [r,f,x,y,hr]),
    t  ← mk_app `eq [x,y] >>= pis (d.params ++ [r,f,x,y,hr]),
-   add_decl $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
+   f ← add_decl' $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
+   -- let r := (@const tt (d.induct.name <.> "bisim_rel") d.induct.u_params).mk_app d.params,
+   -- let e := f.mk_app d.params r,
+   -- t ← expr.binding_domain <$> infer_type e,
+   -- @solve_aux unit t $ do
+   -- { x ← intro1, y ← intro1, h ← intro1,
+   --   C ← target >>= lambdas [x,y],
+   --   let cases_on := (@const tt (d.induct.name <.> "bisim_rel" <.> "cases_on") d.induct.u_params).mk_app d.params C x y h,
+   --   args ← infer_type cases_on >>= mk_mvar_pis,
+   --   exact $ cases_on.mk_app args,
+   --   mzip_with (λ g (c : type_cnstr),
+   --   do { set_goals [g], trace c.name,
+   --        dunfold_target [c.name,``mvfunctor.liftr],
+   --        simp_only [``(mvqpf.cofix.dest_mk)],
+   --        `(∃ _ : %%t, _) ← target,
+   --        v ← mk_meta_var t, trace t,
+   --        let cn := c.name.update_prefix $ c.name.get_prefix <.> "shape",
+   --        let n  := (cn.update_prefix $ cn.get_prefix <.> "pfunctor").append_suffix "_map",
+   --        mk_const n >>= trace_expr,
+   --        let w := (@const tt cn d.induct.u_params).mk_app [], -- d.params v,
+   --        args ← infer_type w >>= mk_mvar_pis,
+   --        let w := w.mk_app args,
+   --        trace "",
+   --        trace_expr w,
+   --        trace "",
+   --        existsi w,
+   --        -- simp_only [] [`typevec],
+   --        trace_state, done })
+   --    args d.induct.ctors,
+   --   trace "",
+   --   trace_state },
+   -- trace_expr $ e,
    skip
 
 meta def mk_bisim_rel (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
-do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
+do let params := d.params.map to_implicit,
+   let t := (@const tt d.induct.name d.induct.u_params).mk_app params,
    let n := d.induct.name <.> "bisim_rel",
    let decl := d.induct,
-   let type_ctor := (@const tt n decl.u_params).mk_app decl.params,
+   let type_ctor := (@const tt n decl.u_params).mk_app params,
    cs ← d.induct.ctors.mmap $ λ c,
    do { args ← c.args.mmap $ λ e,
              if t.occurs e then renew e
@@ -248,8 +281,8 @@ do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
         co_ind ← mzip_with (λ x x' : expr,
         do (args,t) ← infer_type x >>= mk_local_pis,
            pis args (type_ctor (x.mk_app args) (x'.mk_app args)) >>= mk_local_def `h ) xs xs',
-        let x  := (@const tt c.name d.induct.u_params).mk_app $ d.params ++ c.args,
-        let x' := (@const tt c.name d.induct.u_params).mk_app $ d.params ++ args,
+        let x  := (@const tt c.name d.induct.u_params).mk_app $ params ++ c.args,
+        let x' := (@const tt c.name d.induct.u_params).mk_app $ params ++ args,
         return ({ name := c.name.update_prefix n,
                   args := ys ++ xs ++ xs' ++ co_ind,
                   result := [x,x'] } : type_cnstr) },
@@ -259,7 +292,7 @@ do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
             { pre := d.induct.pre,
               name := n,
               u_names := d.induct.u_names,
-              params := d.induct.params,
+              params := params,
               idx := [x,y],
               type := `(Prop),
               ctors := cs },
@@ -306,17 +339,39 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_ind func d,
    pure ()
 
+#check @timetac
+
 @[user_command]
 meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.cofix d,
-   trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
-   trace_error $ mk_constr ``mvqpf.cofix.mk d,
-   trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
-   trace_error $ mk_corecursor func d,
-   trace_error $ mk_cofix_functor_instance d,
-   trace_error $ mk_bisim_rel func d,
+   timetac' "mk_liftp_eqns" $ trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
+   timetac' "mk_constr" $ trace_error $ mk_constr ``mvqpf.cofix.mk d,
+   timetac' "mk_destr" $ trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
+   timetac' "mk_corecursor" $ trace_error $ mk_corecursor func d,
+   timetac' "mk_cofix_functor_instance" $ trace_error $ mk_cofix_functor_instance d,
+   -- trace_error $ mk_bisim_rel func d,
    trace_error $ mk_bisim func d,
+   -- timetac "mk_bisim" $ trace_error $ mk_bisim func d,
+   -- timetac "mk_bisim_rel" $ trace_error $ mk_bisim_rel func d,
    pure ()
 
 end tactic
+-- set_option trace.app_builder true
+codata tree' (α β : Type)
+| nil : tree'
+| cons : α → (β → tree') → tree'
+
+codata part (α : Type)
+| pure : α → part
+| delay : part → part
+
+#check part.corec
+def diverge {α} : part α :=
+part.corec _ unit (λ _, part.shape.delay _ ()) ()
+#check part.bisim
+example {α} : @diverge α = part.delay _ diverge :=
+begin
+  -- apply part.bisim _ (λ _ _, true),
+  conv { to_lhs, rw diverge, }
+end

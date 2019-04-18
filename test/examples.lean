@@ -40,4 +40,7 @@ codata tree' (α β : Type)
 -- #check @tree'.cases_on
 -- #check @tree'.corec
 -- #check @tree'.corec'
--- #check @tree'.bisim
+#check @tree'.bisim
+#print prefix tree'.bisim
+
+section end

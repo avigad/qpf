@@ -101,7 +101,7 @@ class is_lawful {n : ℕ} (F : typevec n → Type*) [mvfunctor F] : Prop :=
 (comp_map     : Π {α β γ : typevec n} (g : α ⟹ β) (h : β ⟹ γ) (x : F α),
                     (h ⊚ g) <$$> x = h <$$> g <$$> x)
 
-export is_lawful (id_map comp_map)
+export mvfunctor.is_lawful
 attribute [simp] id_map
 
 variables {n : ℕ} {α β γ : typevec.{u} n}
@@ -377,49 +377,96 @@ def repeat : Π (n : ℕ) (t : Sort*), typevec n
 | 0 t := fin'.elim0
 | (nat.succ i) t := append1 (repeat i t) t
 
+def prod : Π {n} (α β : typevec.{u} n), typevec n
+| 0 α β := fin'.elim0
+| (succ n) α β := prod (drop α) (drop β) ::: (last α × last β)
+
+infix ` ⊗ `:45 := prod
 
 protected def const {β} (x : β) : Π {n} (α : typevec n), α ⟹ repeat _ β
-| 0 α i := nil_fun i
 | (succ n) α (fin'.raise i) := const (drop α) _
 | (succ n) α fin'.last := λ _, x
 
-lemma const_append1 {β γ} (x : γ) {n} (α : typevec n) : typevec.const x (α ::: β) = typevec.const x α ::: (λ _, x) :=
+open function (uncurry)
+
+def repeat_eq : Π {n} (α : typevec n), α ⊗ α ⟹ repeat _ Prop
+| 0 α := λ i, fin'.elim0 i
+| (succ n) α := repeat_eq (drop α) ::: uncurry eq
+-- | (succ n) α (fin'.raise i) := repeat_eq (drop α) _
+-- | (succ n) α fin'.last := λ x, x.1 = x.2
+
+lemma const_append1 {β γ} (x : γ) {n} (α : typevec n) : typevec.const x (α ::: β) = append_fun (typevec.const x α) (λ _, x) :=
 by ext i : 1; cases i; refl
 
 lemma const_nil {β} (x : β) (α : typevec 0) : typevec.const x α = nil_fun :=
 by ext i : 1; cases i; refl
 
-def pred_last' (α : typevec n) {β : Type*} (p : β → Prop) : α.append1 β ⟹ repeat _ Prop :=
-typevec.const true α ::: p
+lemma repeat_eq_append1 {β} {n} (α : typevec n) : repeat_eq (α ::: β) = split_fun (repeat_eq α) (uncurry eq) :=
+by induction n; refl
+
+lemma repeat_eq_nil (α : typevec 0) : repeat_eq α = nil_fun :=
+by ext i : 1; cases i; refl
+
+def pred_last' (α : typevec n) {β : Type*} (p : β → Prop) : α ::: β ⟹ repeat (n+1) Prop :=
+split_fun (typevec.const true α) p
+
+def rel_last' (α : typevec n) {β : Type*} (p : β → β → Prop) : (α ::: β ⊗ α ::: β) ⟹ repeat (n+1) Prop :=
+split_fun (repeat_eq α) (uncurry p)
 
 def curry (F : typevec.{u} (n+1) → Type*) (α : Type u) (β : typevec.{u} n) : Type* :=
 F (β ::: α)
 
 def drop_repeat (α : Type*) : Π {n}, drop (repeat (succ n) α) ⟹ repeat n α
-| 0 i := fin'.elim0 i
 | (succ n) (fin'.raise i) := drop_repeat i
 | (succ n) fin'.last := _root_.id
 
 def of_repeat : Π {n i} (x : repeat n Prop i), Prop
-| 0 i x := fin'.elim0 i
 | (nat.succ n) (fin'.raise i) x := @of_repeat n i x
 | (nat.succ n) fin'.last x := x
 
--- lemma drop_repeat_comp {α : typevec.{u} n.succ} (p : α ⟹ repeat n.succ Prop) (i : fin' n) : (drop_repeat Prop ⊚ drop_fun p) i _ = p _ _ := _
+lemma const_iff_true {α : typevec n} {i x p} : of_repeat (typevec.const p α i x) ↔ p :=
+by induction i; [erw [typevec.const,@i_ih (drop α) x], refl]
 
-variables  {F : typevec.{u} n → Type*} [mvfunctor F] {α : typevec.{u} n} (p : α ⟹ repeat n Prop)
+variables  {F : typevec.{u} n → Type*} [mvfunctor F] {α β γ : typevec.{u} n} (p : α ⟹ repeat n Prop) (r : α ⊗ α ⟹ repeat n Prop)
+
+def prod.fst : Π {n} {α β : typevec.{u} n}, α ⊗ β ⟹ α
+| (succ n) α β (fin'.raise i) := @prod.fst _ (drop α) (drop β) i
+| (succ n) α β fin'.last := _root_.prod.fst
+
+def prod.snd : Π {n} {α β : typevec.{u} n}, α ⊗ β ⟹ β
+| (succ n) α β (fin'.raise i) := @prod.snd _ (drop α) (drop β) i
+| (succ n) α β fin'.last := _root_.prod.snd
+
+def prod.mk : Π {n} {α β : typevec.{u} n} (i : fin' n), α i → β i → (α ⊗ β) i
+| (succ n) α β (fin'.raise i) := prod.mk i
+| (succ n) α β fin'.last := _root_.prod.mk
+
+lemma repeat_eq_iff_eq {α : typevec n} {i x y} : of_repeat (repeat_eq α i (prod.mk _ x y)) ↔ x = y :=
+by induction i; [erw [repeat_eq,@i_ih (drop α) x y], refl]
 
 def subtype_ : Π {n} {α : typevec.{u} n} (p : α ⟹ repeat n Prop), typevec n
 | 0 α p := fin'.elim0
 | (succ n) α p := @subtype_ n (drop α) (drop_fun p) ::: _root_.subtype (λ x, p fin'.last x)
 
 def subtype_val : Π {n} {α : typevec.{u} n} (p : α ⟹ repeat n Prop), subtype_ p ⟹ α
-| 0 α p i := fin'.elim0 i
 | (succ n) α p (fin'.raise i) := @subtype_val n _ _ i
 | (succ n) α p fin'.last := _root_.subtype.val
 
-lemma subtype_val_append1 {n} {α : typevec.{u} n} (ps : α ⟹ repeat n Prop) {β} (p : β → Prop) : typevec.subtype_val (ps ::: p) = typevec.subtype_val ps ::: subtype.val :=
-funext $ by rintro ⟨ ⟩; refl
+def to_subtype : Π {n} {α : typevec.{u} n} (p : α ⟹ repeat n Prop), (λ (i : fin' n), { x // of_repeat $ p i x }) ⟹ subtype_ p
+| (succ n) α p (fin'.raise i) x := to_subtype (drop_fun p) i x
+| (succ n) α p fin'.last x := x
+
+def of_subtype : Π {n} {α : typevec.{u} n} (p : α ⟹ repeat n Prop), subtype_ p ⟹ (λ (i : fin' n), { x // of_repeat $ p i x })
+| (succ n) α p (fin'.raise i) x := of_subtype _ i x
+| (succ n) α p fin'.last x := x
+
+def to_subtype' : Π {n} {α : typevec.{u} n} (p : α ⊗ α ⟹ repeat n Prop), (λ (i : fin' n), { x : α i × α i // of_repeat $ p i (prod.mk _ x.1 x.2) }) ⟹ subtype_ p
+| (succ n) α p (fin'.raise i) x := to_subtype' (drop_fun p) i x
+| (succ n) α p fin'.last x := ⟨x.val,cast (by congr; simp [prod.mk]) x.property⟩
+
+def of_subtype' : Π {n} {α : typevec.{u} n} (p : α ⊗ α ⟹ repeat n Prop), subtype_ p ⟹ (λ (i : fin' n), { x : α i × α i // of_repeat $ p i (prod.mk _ x.1 x.2) })
+| (succ n) α p (fin'.raise i) x := of_subtype' _ i x
+| (succ n) α p fin'.last x := ⟨x.val,cast (by congr; simp [prod.mk]) x.property⟩
 
 lemma subtype_val_nil {α : typevec.{u} 0} (ps : α ⟹ repeat 0 Prop) : typevec.subtype_val ps = nil_fun :=
 funext $ by rintro ⟨ ⟩; refl
@@ -427,51 +474,109 @@ funext $ by rintro ⟨ ⟩; refl
 def liftp' : F α → Prop :=
 mvfunctor.liftp $ λ i x, of_repeat $ p i x
 
+def liftr' : F α → F α → Prop :=
+mvfunctor.liftr $ λ i x y, of_repeat $ r i $ prod.mk _ x y
+
 def append_fun' {α : typevec' n} {β β' : Type*}
   (f : α ⟹ repeat n β') (g : β → β') : append1 α β ⟹ repeat n.succ β' := split_fun f g
+
+variables [mvfunctor.is_lawful F] (F)
+
+lemma exists_iff_exists_of_mono {p : F α → Prop} {q : F β → Prop} (f : α ⟹ β) (g : β ⟹ α)
+  (h₀ : f ⊚ g = id)
+  (h₁ : ∀ u : F α, p u ↔ q (f <$$> u)) :
+  (∃ u : F α, p u) ↔ (∃ u : F β, q u) :=
+begin
+  split; rintro ⟨u,h₂⟩; [ use f <$$> u, use g <$$> u ],
+  { apply (h₁ u).mp h₂ },
+  { apply (h₁ _).mpr _,
+    simp only [mvfunctor.map_map,h₀,mvfunctor.is_lawful.id_map,h₂] },
+end
+variables {F}
 
 lemma liftp_def (x : F α) : liftp' p x ↔ ∃ u : F (subtype_ p), subtype_val p <$$> u = x :=
 begin
   dsimp [liftp',mvfunctor.liftp],
-  have : (λ (i : fin' n), {x : α i // @of_repeat n i (p i x)}) = (@subtype_ n α p),
-  { resetI, clear _inst_1 x F,
-    ext i,
-    symmetry,
-    induction i generalizing p, dsimp [subtype_,append1], rw @i_ih _ (drop_fun p), refl,
-    refl },
-  congr',
-  { ext, rw this, intros, congr; try { assumption },
-    ext, refl, intros,
-    resetI, clear _inst_1 a_1 a a' x F this,
-    symmetry,
-    induction a'_1 generalizing a_2 p,
-    { dsimp [subtype_val], cases a_3, transitivity, apply a'_1_ih, refl, refl, },
-    cases a_3, refl }
+  apply exists_iff_exists_of_mono F (to_subtype p) (of_subtype p),
+  { clear x _inst_2 _inst_1 F, dsimp [(⊚)],
+    ext i x; induction i, rw [of_subtype,to_subtype,i_ih], refl, refl },
+  { intro, rw [mvfunctor.map_map,(⊚)], congr',
+    clear x u _inst_2 _inst_1 F, ext i ⟨ x,_ ⟩, induction i; dsimp [to_subtype,subtype_val],
+    apply i_ih, refl }
 end
 
+lemma liftr_def (x y : F α) :
+  liftr' r x y ↔
+  ∃ u : F (subtype_ r), (prod.fst ⊚ subtype_val r) <$$> u = x ∧
+                        (prod.snd ⊚ subtype_val r) <$$> u = y :=
+begin
+  dsimp [liftr',mvfunctor.liftr],
+  apply exists_iff_exists_of_mono F (to_subtype' r) (of_subtype' r),
+  { clear x y _inst_2 _inst_1 F, dsimp [(⊚)],
+    ext i x; induction i; rw [of_subtype',to_subtype'],
+    { rw i_ih, refl }, { dsimp [id], cases x, refl } },
+  { intro, rw [mvfunctor.map_map,(⊚),mvfunctor.map_map,(⊚)], congr';
+    clear x y u _inst_2 _inst_1 F, ext i ⟨ x,_ ⟩, induction i; dsimp [to_subtype,subtype_val],
+    apply i_ih, refl, ext i ⟨x,_⟩,
+    induction i, rw i_ih (drop_fun r), refl, refl }
+end
 
 end liftp'
+
 open nat
 
 section liftp_last_pred_iff
-variables  {F : typevec.{u} (n+1) → Type*} [mvfunctor F] {α : typevec.{u} n} (p : α ⟹ repeat n Prop)
+variables  {F : typevec.{u} (n+1) → Type*} [mvfunctor F] [mvfunctor.is_lawful F]
+           {α : typevec.{u} n}
+variables (p : α ⟹ repeat n Prop)
+          (r : α ⊗ α ⟹ repeat n Prop)
 
 open mvfunctor
 
-lemma liftp_last_pred_iff {β} (p : β → Prop) (x : F (α ::: β)) : liftp' (pred_last' _ p) x ↔ liftp (pred_last _ p) x :=
+variables {β : Type u}
+variables (pp : β → Prop)
+
+private def f : Π (n α), (λ (i : fin' (n + 1)), {p_1 // of_repeat (pred_last' α pp i p_1)}) ⟹
+    λ (i : fin' (n + 1)), {p_1 : (α ::: β) i // pred_last α pp p_1}
+| _ α (fin'.raise i) x := ⟨ x.val, cast (by simp only [pred_last]; erw const_iff_true) x.property ⟩
+| _ α fin'.last x := ⟨ x.val, x.property ⟩
+
+private def g : Π (n α), (λ (i : fin' (n + 1)), {p_1 : (α ::: β) i // pred_last α pp p_1}) ⟹
+    (λ (i : fin' (n + 1)), {p_1 // of_repeat (pred_last' α pp i p_1)})
+| _ α (fin'.raise i) x := ⟨ x.val, cast (by simp only [pred_last]; erw const_iff_true) x.property ⟩
+| _ α fin'.last x := ⟨ x.val, x.property ⟩
+
+lemma liftp_last_pred_iff {β} (p : β → Prop) (x : F (α ::: β)) :
+  liftp' (pred_last' _ p) x ↔ liftp (pred_last _ p) x :=
 begin
-  let f : α ::: β ⟹ repeat _ Prop := (typevec.const true α ::: p : α ::: β ⟹ _),
-  have : ∀ (i : fin' (n + 1)), (λ x, of_repeat (pred_last' α p i x)) = (@pred_last _ α _ p _),
-  { intros, ext, cases i; dsimp [append1,pred_last',append_fun,split_fun,(∈),set.mem],
-    clear_except, dunfold has_add.add nat.add, erw of_repeat,
-    induction i_a, dsimp [typevec.const], erw [of_repeat,i_a_ih], refl,
-    refl, refl, },
   dsimp [liftp,liftp'],
-  congr', ext, rw this,
-  intros, ext, congr, simp [this],
-  intros, congr', simp [this], ext, refl,
-  intros, ext, cases a_3, rw this,
-  cases a_3, rw this, rintros _ _ ⟨ ⟩, refl,
+  apply exists_iff_exists_of_mono F (f _ n α) (g _ n α),
+  { clear x _inst_2 _inst_1 F, ext i ⟨x,_⟩, cases i; refl },
+  { intros, rw [mvfunctor.map_map,(⊚)],
+    congr'; ext i ⟨x,_⟩; cases i; refl }
+end
+
+open function
+variables (rr : β → β → Prop)
+
+private def f : Π (n α), (λ (i : fin' (n + 1)), {p_1 : _ × _ // of_repeat (rel_last' α rr i (prod.mk _ p_1.fst p_1.snd))}) ⟹
+    λ (i : fin' (n + 1)), {p_1 : (α ::: β) i × _ // rel_last α rr (p_1.fst) (p_1.snd)}
+| _ α (fin'.raise i) x := ⟨ x.val, cast (by simp only [rel_last]; erw repeat_eq_iff_eq) x.property ⟩
+| _ α fin'.last x := ⟨ x.val, x.property ⟩
+
+private def g : Π (n α), (λ (i : fin' (n + 1)), {p_1 : (α ::: β) i × _ // rel_last α rr (p_1.fst) (p_1.snd)}) ⟹
+    (λ (i : fin' (n + 1)), {p_1 : _ × _ // of_repeat (rel_last' α rr i (prod.mk _ p_1.fst p_1.snd))})
+| _ α (fin'.raise i) x := ⟨ x.val, cast (by simp only [rel_last]; erw repeat_eq_iff_eq) x.property ⟩
+| _ α fin'.last x := ⟨ x.val, x.property ⟩
+
+lemma liftr_last_rel_iff  (x y : F (α ::: β)) :
+  liftr' (rel_last' _ rr) x y ↔ liftr (rel_last _ rr) x y :=
+begin
+  dsimp [liftr,liftr'],
+  apply exists_iff_exists_of_mono F (f rr _ _) (g rr _ _),
+  { clear x y _inst_2 _inst_1 F, ext i ⟨x,_⟩, cases i; refl },
+  { intros, rw [mvfunctor.map_map,mvfunctor.map_map,(⊚),(⊚)],
+    congr'; ext i ⟨x,_⟩; cases i; refl }
 end
 
 end liftp_last_pred_iff

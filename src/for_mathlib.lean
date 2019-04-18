@@ -632,6 +632,12 @@ do t ← infer_type e,
    exact $ new_goal e heq,
    gs ← get_goals, set_goals $ new_goal :: gs
 
+meta def mk_mvar_pis : expr → tactic (list expr)
+| (pi n bi d b) :=
+do v ← mk_meta_var d,
+   cons v <$> mk_mvar_pis (b.instantiate_var v)
+| _ := pure []
+
 open interactive.types interactive lean.parser
 
 @[user_command]
