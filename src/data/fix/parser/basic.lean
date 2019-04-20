@@ -691,7 +691,6 @@ do β ← func.live_params.mmap $ tfst renew,
           df ← instantiate_mvars df,
           let n := cn.append_suffix "_map",
           add_decl $ declaration.thm n func.induct.u_names t (pure df),
-          let n' := mk_simp_attr_decl_name `typevec,
           simp_attr.typevec.set n () tt },
    skip
 

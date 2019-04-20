@@ -209,15 +209,18 @@ def to_list {α} (x : t α) : list α :=
 
 end traversable
 
-/-
+
 namespace name
 
 -- def append_suffix : name → string → name
 -- | (mk_string s n) s' := mk_string (s ++ s') n
 -- | n _ := n
 
+def bundle : name → name → name
+| (mk_string s n) (mk_string s' _) := mk_string (s ++ "_" ++ s') n
+| n _ := n
+
 end name
--/
 
 namespace level
 
@@ -632,6 +635,15 @@ do t ← infer_type e,
    exact $ new_goal e heq,
    gs ← get_goals, set_goals $ new_goal :: gs
 
+meta def solve_async (vs : list $ list expr) (p : expr) (tac : tactic unit) : tactic (task expr) :=
+run_async $ do
+  pr ← prod.snd <$> solve_aux p tac >>= instantiate_mvars,
+  vs.reverse.mfoldl (flip lambdas) pr
+
+meta def solve_sync (vs : list $ list expr) (p : expr) (tac : tactic unit) : tactic (task expr) :=
+do pr ← prod.snd <$> solve_aux p tac >>= instantiate_mvars,
+   return <$> vs.reverse.mfoldl (flip lambdas) pr
+
 open interactive.types interactive lean.parser
 
 @[user_command]
@@ -747,3 +759,6 @@ lemma eq_mpr_of_mp_eq : Π {α β} {h : α = β} {x : α} {y : β} (h' : h.mp x 
 
 lemma mp_eq_of_eq_mpr : Π {α β} {h : α = β} {x : α} {y : β} (h' : x = h.mpr y), h.mp x = y
 | _ _ rfl _ _ := id
+
+lemma mp_eq_of_heq : Π {α β} {h : α = β} {x : α} {y : β} (h' : x == y), h.mp x = y
+| _ _ rfl _ _ heq.rfl := rfl

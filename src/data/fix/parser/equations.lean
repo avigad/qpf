@@ -51,6 +51,40 @@ do let params := d.params.map to_implicit,
    add_decl $ mk_definition (d.induct.name <.> "cases_on") (u :: d.induct.u_names) rec_t df,
    pure ()
 
+meta def mk_destr_constr_eqn (dest_mk : name) (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+do let params := d.params.map to_implicit,
+   let my_t := (@const tt d.induct.name d.induct.u_params).mk_app params,
+   let u := fresh_univ d.induct.u_names,
+   C ← mk_local' `C binder_info.implicit (my_t.imp (sort $ level.param u)),
+   let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app $ d.dead_params.map prod.fst,
+   let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app params my_t,
+   C' ← mk_local' `C binder_info.implicit (my_shape_t.imp (sort $ level.param u)),
+   let cases_on := @const tt (d.induct.name <.> "cases_on") (level.param u :: d.induct.u_params),
+   let cases_on := cases_on.mk_app params C,
+   let shape_cases_on := (@const tt (d.induct.name <.> "shape" <.> "cases_on") (level.param u :: d.induct.u_params)).mk_app params my_t C',
+   (_ :: vs,_) ← infer_type cases_on >>= mk_local_pis,
+   (c :: vs',_) ← infer_type shape_cases_on >>= mk_local_pis,
+   c' ← renew c,
+   h ← mk_app `eq [c,c'] >>= mk_local_def `h,
+   t ← mk_mapp `heq [none,shape_cases_on.mk_app $ c :: vs',none,shape_cases_on.mk_app $ c' :: vs']
+     >>= pis [c,c',h] >>= pis (C' :: vs') >>= pis params,
+   (_,cases_congr) ← solve_aux t $ prove_goal_async (intros >> cc),
+   (d.induct.ctors.zip vs).mmap' $ λ ⟨ctor,v⟩,
+   do { let c := ((@const tt ctor.name d.induct.u_params).mk_app params).mk_app ctor.args,
+        eqn ← mk_app `eq [cases_on.mk_app $ c::vs,v.mk_app ctor.args],
+        df ← solve_async [params,C::vs,ctor.args] eqn $ do
+        { dunfold_target [d.induct.name <.> "cases_on",ctor.name],
+          applyc ``mp_eq_of_heq,
+          transitivity,
+          apply cases_congr,
+          applyc dest_mk, reflexivity,
+          done },
+        t ← pis ctor.args eqn >>= pis (C :: vs) >>= pis (params),
+        let n := ((d.induct.name <.> "cases_on").bundle ctor.name),
+        add_decl $ declaration.thm n (u :: d.induct.u_names) t df,
+        simp_attr.pseudo_eqn.set n () tt,
+        skip }
+
 open tactic.interactive (rw_rules_t rw_rule)
 open tactic.interactive.rw_rules_t
 open interactive.rw_rule
@@ -300,10 +334,13 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
    trace_error $ mk_constr ``mvqpf.fix.mk d,
    trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
+   trace_error $ mk_destr_constr_eqn ``mvqpf.fix.dest_mk func d,
    trace_error $ mk_recursor func d,
    trace_error $ mk_dep_recursor func d,
    trace_error $ mk_fix_functor_instance d,
    trace_error $ mk_ind func d,
+   trace_error $ mk_no_confusion_type d.induct,
+   trace_error $ mk_no_confusion d.induct,
    pure ()
 
 @[user_command]
@@ -313,10 +350,13 @@ do d ← inductive_decl.parse meta_info,
    trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
    trace_error $ mk_constr ``mvqpf.cofix.mk d,
    trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
+   trace_error $ mk_destr_constr_eqn ``mvqpf.cofix.dest_mk func d,
    trace_error $ mk_corecursor func d,
    trace_error $ mk_cofix_functor_instance d,
    trace_error $ mk_bisim_rel func d,
    trace_error $ mk_bisim func d,
+   trace_error $ mk_no_confusion_type d.induct,
+   trace_error $ mk_no_confusion d.induct,
    pure ()
 
 end tactic
