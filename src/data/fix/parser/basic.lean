@@ -177,9 +177,8 @@ do let decl := func.decl,
    lhs ← mk_internal_functor_app func,
    let rhs := (@expr.const tt decl.to_name decl.univ_levels).mk_app func.params,
    p ← mk_app `eq [lhs,rhs] >>= pis func.params,
-   (_,pr) ← solve_aux p $ intros >> reflexivity,
-   pr ← instantiate_mvars pr,
-   add_decl $ declaration.thm func.eqn_name decl.univ_params p (pure pr)
+   pr ← solve_async [] p $ intros >> reflexivity,
+   add_decl $ declaration.thm func.eqn_name decl.univ_params p pr
 
 -- meta def mk_internal_functor (n : name) : tactic internal_mvfunctor :=
 -- do decl ← get_decl n,
@@ -278,11 +277,10 @@ do env ← get_env,
        let x := e.mk_app vs,
        let map_e := (@expr.const tt func.map_name func.decl.univ_levels).mk_app (mk_arg_list func.dead_params ++ [α,β,f,x]),
        eqn ← mk_app `eq [map_e,(e'.mk_app vs')] >>= pis (func.params ++ live_params'.map prod.fst ++ fs.map prod.snd ++ vs) >>= instantiate_mvars,
-       (_,pr) ← solve_aux eqn $ do
+       pr ← solve_async [] eqn $ do
          { intros >> reflexivity },
-       pr ← instantiate_mvars pr,
        let n := func.map_name <.> ("_equation_" ++ to_string i),
-       add_decl $ declaration.thm n decl.univ_params eqn (pure pr),
+       add_decl $ declaration.thm n decl.univ_params eqn pr,
        simp_attr.typevec.set n () tt,
        pure () }
 
@@ -600,11 +598,10 @@ do let u := fresh_univ func.induct.u_names,
      (args,_) ← infer_type c >>= mk_local_pis,
      let x := c.mk_app args,
      t ← mk_app `eq [rec.mk_app (fs ++ [x]),f.mk_app args] >>= pis (func.params ++ C :: fs ++ args),
-     (_,df) ← solve_aux t $ do
+     df ← solve_async [] t $ do
      { intros, reflexivity },
-     df ← instantiate_mvars df,
      let n := cn.append_suffix "_rec",
-     add_decl $ declaration.thm n (u :: func.induct.u_names) t (pure df),
+     add_decl $ declaration.thm n (u :: func.induct.u_names) t df,
      simp_attr.typevec.set n () tt }) func.induct.ctors fs,
    skip
 
@@ -681,16 +678,15 @@ do β ← func.live_params.mmap $ tfst renew,
                  lambdas ws (f $ v.mk_app ws) },
           let rhs := c'.mk_app vs',
           t ← mk_app `eq [lhs,rhs] >>= pis (func.params ++ β.map prod.fst ++ fs ++ vs),
-          (_,df) ← solve_aux t $ do
+          df ← solve_async [] t $ do
           { intros,
             dunfold_target cs,
             map_eq ← mk_const ``mvpfunctor.map_eq, rewrite_target map_eq { md := semireducible },
             simp_only [``(append_fun_comp'),``(nil_fun_comp)],
             done <|> reflexivity <|> (congr; ext [rcases_patt.many [[rcases_patt.one `_]]] none; reflexivity),
             done },
-          df ← instantiate_mvars df,
           let n := cn.append_suffix "_map",
-          add_decl $ declaration.thm n func.induct.u_names t (pure df),
+          add_decl $ declaration.thm n func.induct.u_names t df,
           simp_attr.typevec.set n () tt },
    skip
 
@@ -778,7 +774,7 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
          list.ret <$> pis args (f $ arg.mk_app args) },
      let rhs := mk_conj args.join,
      t ← pis (c.args.map to_implicit) $ (df x').imp rhs,
-     (_,df) ← solve_aux t $ do
+     df ← solve_async [func.params,fs] t $ do
      { solve1 $ do
        { args ← intron' c.args.length,
          mk_const ``typevec.liftp_def >>= rewrite_target,
@@ -805,9 +801,7 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
          done },
        done },
      t ← pis ((func.params ++ fs).map to_implicit) t,
-     df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
-     add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t (pure df) },
-
+     add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t df },
    skip
 
 open interactive lean.parser lean

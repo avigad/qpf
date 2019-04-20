@@ -92,7 +92,8 @@ do let cases_on_n := decl.mk_name "cases_on",
    (>>= list_meta_vars) <$> cs.mmap instantiate_mvars.
 
 meta def mk_no_confusion_type (decl : inductive_type) : tactic unit :=
-do let t := (const decl.name $ decl.u_params).mk_app $ decl.params ++ decl.idx,
+do let params := decl.params.map to_implicit,
+   let t := (const decl.name $ decl.u_params).mk_app $ params ++ decl.idx,
    let u := fresh_univ decl.u_names,
    let cases_on_n := decl.mk_name "cases_on",
    cases_on ← mk_const cases_on_n,
@@ -109,7 +110,7 @@ do let t := (const decl.name $ decl.u_params).mk_app $ decl.params ++ decl.idx,
             h ← pis hs P,
             pure $ h.imp P
           else pure P },
-   let vs := (decl.params ++ decl.idx ++ [P,v1,v2]),
+   let vs := (params ++ decl.idx ++ [P,v1,v2]),
    e ← lambdas vs e,
    p ← pis vs (sort $ level.param u),
    infer_type e >>= unify p,
@@ -119,14 +120,15 @@ do let t := (const decl.name $ decl.u_params).mk_app $ decl.params ++ decl.idx,
 run_cmd mk_simp_attr `pseudo_eqn
 
 meta def mk_no_confusion (decl : inductive_type) : tactic unit :=
-do let t := (const decl.name $ decl.u_params).mk_app $ decl.params ++ decl.idx,
+do let params := decl.params.map to_implicit,
+   let t := (const decl.name $ decl.u_params).mk_app $ params ++ decl.idx,
    let u := fresh_univ decl.u_names,
    v1 ← mk_local_def `v1 t,
    v2 ← mk_local_def `v2 t,
    P  ← mk_local_def `P (expr.sort $ level.param u),
    type ← mk_const (decl.mk_name "no_confusion_type"),
    Heq ← mk_app `eq [v1,v2] >>= mk_local_def `Heq,
-   let vs := (decl.params ++ decl.idx ++ [P,v1,v2]).map to_implicit,
+   let vs := (params ++ decl.idx ++ [P,v1,v2]).map to_implicit,
    p ← unify_app type vs,
    let vs := vs ++ [Heq],
    (_,pr) ← solve_aux p $

@@ -21,6 +21,10 @@ data tree (α β : Type)
 -- #check @tree.rec
 -- #check @tree.ind
 -- #check @tree.drec
+-- #check @tree.cases_on_nil
+-- #check @tree.cases_on_cons
+-- #print tree.no_confusion_type
+-- #check @tree.no_confusion
 
 codata tree' (α β : Type)
 | nil : tree'
@@ -41,3 +45,7 @@ codata tree' (α β : Type)
 -- #check @tree'.corec
 -- #check @tree'.corec'
 -- #check @tree'.bisim
+-- #check @tree'.cases_on_nil
+-- #check @tree'.cases_on_cons
+-- #print tree'.no_confusion_type
+-- #check @tree'.no_confusion
