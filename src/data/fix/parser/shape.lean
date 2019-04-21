@@ -55,7 +55,7 @@ do let dead := func.dead_params.map prod.fst,
    let intl_n := func.decl.to_name.get_prefix <.> "internal",
    add_decl $ mk_definition intl_n func.induct.u_names t df,
    v ← mk_live_vec func.vec_lvl $ func.live_params.init.map prod.fst,
-   df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app (func.dead_params.map prod.fst ++ [v]),
+   df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app (func.dead_params.map prod.fst) v,
    t  ← infer_type df,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()

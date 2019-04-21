@@ -64,6 +64,22 @@ def mrepeat {α} : ℕ → m α → m (list α)
 | 0        cmd := pure []
 | (succ n) cmd := (::) <$> cmd <*> mrepeat n cmd
 
+open function
+
+meta def par_join (xs : list (task unit)) : tactic unit :=
+pure $ xs.foldl (const _ task.get) ()
+
+meta def par_mmap' {α} (f : α → tactic unit) (xs : list α) : tactic unit :=
+do ys ← xs.mmap $ tactic.run_async ∘ f,
+   par_join ys
+
+meta def par_mmap {α β} (f : α → tactic β) (xs : list α) : tactic (list β) :=
+do ys ← xs.mmap $ tactic.run_async ∘ f,
+   pure $ ys.map task.get
+
+meta def par_sequence (xs : list (tactic unit)) : tactic unit :=
+par_mmap' id xs
+
 end list
 namespace roption
 variables {α : Type*} {β : Type*} {γ : Type*}
@@ -314,6 +330,9 @@ end
 meta def instantiate_pi : expr → list expr → expr
 | (expr.pi n bi d b) (e::es) := instantiate_pi (b.instantiate_var e) es
 | e _ := e
+
+meta def mk_app' (e : expr) (xs : list $ list expr) : expr :=
+xs.foldl mk_app e
 
 end expr
 
@@ -643,6 +662,30 @@ run_async $ do
 meta def solve_sync (vs : list $ list expr) (p : expr) (tac : tactic unit) : tactic (task expr) :=
 do pr ← prod.snd <$> solve_aux p tac >>= instantiate_mvars,
    return <$> vs.reverse.mfoldl (flip lambdas) pr
+
+meta def prove_goal_async' (xs : list expr) (tac : tactic unit) : tactic unit := do
+tgt ← target, tgt' ← instantiate_mvars tgt >>= pis xs,
+env ← get_env, tgt' ← return $ env.unfold_untrusted_macros tgt',
+when tgt.has_meta_var (fail "goal contains metavariables"),
+params ← return tgt.collect_univ_params,
+lemma_name ← new_aux_decl_name,
+proof ← run_async (do
+  goal_meta ← mk_meta_var tgt,
+  set_goals [goal_meta],
+  tac,
+  proof ← instantiate_mvars goal_meta,
+  proof ← return $ env.unfold_untrusted_macros proof,
+  proof ← lambdas xs proof,
+  when proof.has_meta_var $ fail "async proof failed: contains metavariables",
+  return proof),
+add_decl $ declaration.thm lemma_name params tgt' proof,
+exact $ (expr.const lemma_name (params.map level.param)).mk_app xs
+
+meta def lambdas' (xs : list $ list expr) (e : expr) : tactic expr :=
+xs.mfoldr lambdas e
+
+meta def pis' (xs : list $ list expr) (e : expr) : tactic expr :=
+xs.mfoldr pis e
 
 open interactive.types interactive lean.parser
 
