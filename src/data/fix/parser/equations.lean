@@ -268,6 +268,7 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    add_decl $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
    skip
 
+open environment.implicit_infer_kind
 meta def mk_bisim_rel (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
    let n := d.induct.name <.> "bisim_rel",
@@ -286,7 +287,8 @@ do let t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
         let x' := (@const tt c.name d.induct.u_params).mk_app' [d.params,args],
         return ({ name := c.name.update_prefix n,
                   args := ys ++ xs ++ xs' ++ co_ind,
-                  result := [x,x'] } : type_cnstr) },
+                  result := [x,x'],
+                  infer := relaxed_implicit } : type_cnstr) },
    x ← mk_local_def `x t,
    y ← mk_local_def `y t,
    let decl : inductive_type :=
@@ -330,33 +332,35 @@ do let params := func.dead_params.map prod.fst,
 @[user_command]
 meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
-   (func,d) ← mk_datatype ``mvqpf.fix d,
-   trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
-   trace_error $ mk_constr ``mvqpf.fix.mk d,
-   trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
-   trace_error $ mk_destr_constr_eqn ``mvqpf.fix.dest_mk func d,
-   trace_error $ mk_recursor func d,
-   trace_error $ mk_dep_recursor func d,
-   trace_error $ mk_fix_functor_instance d,
-   trace_error $ mk_ind func d,
-   trace_error $ mk_no_confusion_type d.induct,
-   trace_error $ mk_no_confusion d.induct,
-   pure ()
+   trace_error $ do
+     (func,d) ← mk_datatype ``mvqpf.fix d,
+     mk_liftp_eqns func.to_internal_mvfunctor,
+     mk_constr ``mvqpf.fix.mk d,
+     mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
+     mk_destr_constr_eqn ``mvqpf.fix.dest_mk func d,
+     mk_recursor func d,
+     mk_dep_recursor func d,
+     mk_fix_functor_instance d,
+     mk_ind func d,
+     mk_no_confusion_type d.induct,
+     mk_no_confusion d.induct,
+     pure ()
 
 @[user_command]
 meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
 do d ← inductive_decl.parse meta_info,
-   (func,d) ← mk_datatype ``mvqpf.cofix d,
-   trace_error $ mk_liftp_eqns func.to_internal_mvfunctor,
-   trace_error $ mk_constr ``mvqpf.cofix.mk d,
-   trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
-   trace_error $ mk_destr_constr_eqn ``mvqpf.cofix.dest_mk func d,
-   trace_error $ mk_corecursor func d,
-   trace_error $ mk_cofix_functor_instance d,
-   trace_error $ mk_bisim_rel func d,
-   trace_error $ mk_bisim func d,
-   trace_error $ mk_no_confusion_type d.induct,
-   trace_error $ mk_no_confusion d.induct,
-   pure ()
+   trace_error $ do
+     (func,d) ← mk_datatype ``mvqpf.cofix d,
+     mk_liftp_eqns func.to_internal_mvfunctor,
+     mk_constr ``mvqpf.cofix.mk d,
+     mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
+     mk_destr_constr_eqn ``mvqpf.cofix.dest_mk func d,
+     mk_corecursor func d,
+     mk_cofix_functor_instance d,
+     mk_bisim_rel func d,
+     mk_bisim func d,
+     mk_no_confusion_type d.induct,
+     mk_no_confusion d.induct,
+     pure ()
 
 end tactic

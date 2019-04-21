@@ -7,17 +7,22 @@ import for_mathlib
 
 namespace tactic
 open expr
+open environment ( implicit_infer_kind intro_rule ) environment.implicit_infer_kind
 
-@[derive has_reflect]
+attribute [derive has_to_format] binder_info implicit_infer_kind
+
 meta structure type_cnstr :=
 (name : name)
 (args : list expr)
 (result : list expr)
+(infer : implicit_infer_kind)
+
+meta def local_ctor (n : name) : expr → expr :=
+local_const n n binder_info.default
 
 meta instance : has_to_format type_cnstr :=
-{ to_format := λ ⟨n,a,r⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
+{ to_format := λ ⟨n,a,r,_⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
 
-attribute [derive has_to_format] binder_info
 
 -- @[derive [has_reflect,has_to_format]]
 meta structure inductive_type :=
@@ -34,6 +39,20 @@ meta structure inductive_type :=
 
 meta def inductive_type.u_params (decl : inductive_type) :=
 decl.u_names.map level.param
+
+meta def inductive_type.type_ctor (decl : inductive_type) : expr :=
+(@const tt decl.name decl.u_params).mk_app decl.params
+
+meta def inductive_type.sig (decl : inductive_type) : tactic expr :=
+local_ctor decl.name <$> pis decl.idx decl.type
+
+meta def inductive_type.intros (decl : inductive_type) : tactic (list expr) :=
+do let t := inductive_type.type_ctor decl,
+   decl.ctors.mmap $ λ c, local_ctor c.name <$> pis c.args (t.mk_app c.result)
+
+meta def type_cnstr.to_intro_rule (decl : inductive_type) (c : type_cnstr) : intro_rule :=
+let t := inductive_type.type_ctor decl in
+⟨ c.name, (t.mk_app c.result).pis c.args, c.infer ⟩
 
 meta def inductive_type.mk_const (decl : inductive_type) (n : string) : expr :=
 const (decl.name <.> n) $ decl.u_params
@@ -160,27 +179,34 @@ meta def inductive_type.get_constructor (c_name : name) : inductive_type → opt
 | { ctors := ctors, .. } := ctors.find (λ c, c.name = c_name)
 
 meta def type_cnstr.type (decl : inductive_type) : type_cnstr → tactic expr
-| ⟨cn,vs,r⟩ :=
-let sig_c  : expr := const decl.name decl.u_params in
-tactic.pis (decl.params.map to_implicit ++ vs) $ sig_c.mk_app $ decl.params ++ r
+| ⟨cn,vs,r,i⟩ :=
+do let sig_c  : expr := const decl.name decl.u_params,
+   ts ← vs.mmap infer_type,
+   let params : list expr := match i with
+                             | implicit := decl.params
+                             | relaxed_implicit := decl.params.map to_implicit
+                             | none := decl.params.map $ λ v, if v ∈ ts then to_implicit v
+                                                                        else v
+                             end,
+   tactic.pis vs (sig_c.mk_app' [decl.params,r]) >>= pis params
 
 meta def mk_inductive : inductive_type → tactic unit
-| decl@{ u_names := u_names, params := params, ctors := ctors, .. } :=
-do env ← get_env,
-   let n := decl.name,
-   sig_t ← pis (decl.params ++ decl.idx) decl.type,
-   let sig_c  : expr := const n decl.u_params,
-   cs ← ctors.mmap $ λ c,
-   do { t ← c.type decl,
-        pure (c.name.update_prefix n,t) },
-   env ← env.add_inductive n u_names params.length sig_t cs ff,
-   set_env env,
-   -- lean.parser.with_input lean.parser.command_like _,
-   mk_cases_on decl,
-   mk_no_confusion_type decl,
-   mk_no_confusion decl
+| decl :=
+do opt ← get_options,
+   updateex_env $ λ e : environment,
+     e.add_ginductive opt decl.u_names decl.params
+     [((decl.name,decl.type.pis decl.idx),decl.ctors.map $ type_cnstr.to_intro_rule decl)] ff,
+   pure ()
 
 open interactive
+
+meta def implicit_infer_kind_of (us : list expr) : implicit_infer_kind :=
+let b₀ := us.all $ λ v, v.local_binder_info = binder_info.default,
+    b₁ := us.all $ λ v, v.local_binder_info ≠ binder_info.default in
+if b₀ then if b₁ then implicit
+                 else none
+else if b₁ then relaxed_implicit
+           else implicit
 
 meta def inductive_type.of_name (decl : name) : tactic inductive_type :=
 do d ← get_decl decl,
@@ -191,10 +217,13 @@ do d ← get_decl decl,
    do { let e := @const tt c d.univ_levels,
         t ← infer_type $ e.mk_app params,
         (vs,t) ← unpi t,
+        (us,_) ← infer_type e >>= mk_local_pis,
+        let infer := implicit_infer_kind_of $ us.take params.length,
         pure (t.get_app_fn.const_name,{ type_cnstr .
                name := c,
                args := vs,
-               result := t.get_app_args.drop $ env.inductive_num_params decl }) },
+               result := t.get_app_args.drop $ env.inductive_num_params decl,
+               infer  := infer }) },
    pure { pre := decl.get_prefix,
           name := decl,
           u_names := d.univ_params,
@@ -203,7 +232,7 @@ do d ← get_decl decl,
           ctors := cs.map prod.snd }
 
 meta def inductive_type.of_decl (decl : inductive_decl) : tactic inductive_type :=
-do d ← decl.decls.nth 0,
+do [d] ← pure decl.decls | fail "mutually (co)inductive types are not supported",
    (idx,t) ← infer_type  d.sig >>= unpi,
    cs ← d.intros.mmap $ λ c : expr,
    do { t ← infer_type c,
@@ -211,7 +240,8 @@ do d ← decl.decls.nth 0,
         pure (t.get_app_fn.const_name,{ type_cnstr .
                name := c.local_pp_name,
                args := vs,
-               result := t.get_app_args.drop $ decl.params.length }) },
+               result := t.get_app_args.drop $ decl.params.length,
+               infer  := relaxed_implicit }) },
    let n := (prod.fst <$> cs.nth 0).get_or_else d.sig.local_pp_name,
    pure { pre := n.get_prefix,
           name := n,
@@ -219,18 +249,5 @@ do d ← decl.decls.nth 0,
           params := decl.params,
           idx := idx, type := t,
           ctors := cs.map prod.snd }
-
-meta def local_ctor (n : name) : expr → expr :=
-local_const n n binder_info.default
-
-meta def inductive_type.type_ctor (decl : inductive_type) : expr :=
-(@const tt decl.name decl.u_params).mk_app decl.params
-
-meta def inductive_type.sig (decl : inductive_type) : tactic expr :=
-local_ctor decl.name <$> pis decl.idx decl.type
-
-meta def inductive_type.intros (decl : inductive_type) : tactic (list expr) :=
-do let t := inductive_type.type_ctor decl,
-   decl.ctors.mmap $ λ c, local_ctor c.name <$> pis c.args (t.mk_app c.result)
 
 end tactic

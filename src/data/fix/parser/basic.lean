@@ -62,11 +62,16 @@ meta def level.repr : level → ℕ → string
 
 meta instance level.has_repr : has_repr level := ⟨ λ l, level.repr l 0 ⟩
 
-attribute [derive has_repr] reducibility_hints declaration type_cnstr inductive_type
+def no_print {α} (x : string) (y : α) := y
 
-@[derive has_repr]
+meta instance no_print.has_to_format {msg : string} (x : Sort*) : has_to_format (no_print msg x) :=
+⟨ λ _, format!"⟨ {msg} ⟩" ⟩
+
+attribute [derive has_to_format] reducibility_hints type_cnstr inductive_type
+
+@[derive has_to_format]
 meta structure internal_mvfunctor :=
-(decl : declaration)
+(decl : no_print "declaration" declaration)
 (induct : inductive_type)
 (def_name eqn_name map_name abs_name repr_name pfunctor_name : name)
 (univ_params : list level)
@@ -82,28 +87,22 @@ do let n₀ := name.anonymous,
    cn ← mk_local_def (decl.name.replace_prefix decl.pre n₀) t,
    brs ← decl.ctors.mmap $ λ c,
        do { let rt := cn.mk_app c.result,
-            t ← pis c.args rt,
-            pure format!"| {(c.name.update_prefix n₀).to_string} : {expr.parsable_printer t}" },
+            t ← pis c.args rt >>= pp,
+            pure format!"| {(c.name.update_prefix n₀).to_string} : {t}" },
    args ← decl.params.mmap $ λ p,
-     do { t ← infer_type p,
-          pure $ expr.fmt_binder p.local_pp_name p.binding_info (expr.parsable_printer t) },
+     do { t ← infer_type p >>= pp,
+          pure $ expr.fmt_binder p.local_pp_name p.binding_info t },
+   t ← pp t,
    let xs := format!"
-inductive {cn} {format.intercalate \" \" args} : {expr.parsable_printer t}
+inductive {cn} {format.intercalate \" \" args} : {t}
 {format.intercalate \"\n\" brs}",
    return xs
-
-meta def mk_inductive' : inductive_type → lean.parser unit
-| decl :=
-do xs ← decl.to_format,
-   lean.parser.with_input lean.parser.command_like xs.to_string,
-   pure ()
 
 meta def internalize_mvfunctor (ind : inductive_type) : tactic internal_mvfunctor :=
 do let decl := declaration.cnst ind.name ind.u_names ind.type tt,
    let n := decl.to_name,
    let df_name := n <.> "internal",
    let lm_name := n <.> "internal_eq",
-   -- decl ← get_decl n,
    (params,t) ← mk_local_pis decl.type,
    let params := ind.params ++ params,
    (m,m') ← live_vars ind,
@@ -166,7 +165,6 @@ do nil  ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
      app ← mk_const ``typevec.append_fun,
      mk_mapp ``typevec.append_fun [none,none,none,none,none,s,e]) nil_fun
 
-
 meta def mk_internal_functor_app (func : internal_mvfunctor) : tactic expr :=
 do let decl := func.decl,
    vec ← mk_live_vec func.vec_lvl $ func.live_params.map prod.fst,
@@ -180,16 +178,16 @@ do let decl := func.decl,
    pr ← solve_async [] p $ intros >> reflexivity,
    add_decl $ declaration.thm func.eqn_name decl.univ_params p pr
 
--- meta def mk_internal_functor (n : name) : tactic internal_mvfunctor :=
--- do decl ← get_decl n,
---    func ← internalize_mvfunctor decl,
---    mk_internal_functor_def func,
---    mk_internal_functor_eqn func,
---    pure func
+meta def mk_internal_functor (n : name) : tactic internal_mvfunctor :=
+do d ← inductive_type.of_name n,
+   func ← internalize_mvfunctor d,
+   mk_internal_functor_def func,
+   mk_internal_functor_eqn func,
+   pure func
 
-meta def mk_internal_functor' (d : interactive.inductive_decl) : lean.parser internal_mvfunctor :=
+meta def mk_internal_functor' (d : interactive.inductive_decl) : tactic internal_mvfunctor :=
 do d ← inductive_type.of_decl d,
-   mk_inductive' d,
+   mk_inductive d,
    func ← internalize_mvfunctor d,
    mk_internal_functor_def func,
    mk_internal_functor_eqn func,
@@ -304,7 +302,7 @@ do map_d ← mk_mvfunctor_map func,
 
 open expr (const)
 
-meta def mk_head_t (decl : inductive_type) (func : internal_mvfunctor) : lean.parser inductive_type :=
+meta def mk_head_t (decl : inductive_type) (func : internal_mvfunctor) : tactic inductive_type :=
 do let n := decl.name,
    let head_n := (n <.> "head_t"),
    let sig_c  : expr := const n decl.u_params,
@@ -314,9 +312,9 @@ do let n := decl.name,
                pure $ ¬ ∃ v ∈ func.live_params, expr.occurs (prod.fst v) t },
         pure { name := d.name.update_prefix head_n, args := vs', .. d } },
    let decl' := { name := head_n, ctors := cs, params := func.dead_params.map prod.fst, .. decl },
-   decl' <$ mk_inductive' decl'
+   decl' <$ mk_inductive decl'
 
-meta def mk_child_t (decl : inductive_type) (func : internal_mvfunctor) : lean.parser (list inductive_type) :=
+meta def mk_child_t (decl : inductive_type) (func : internal_mvfunctor) : tactic (list inductive_type) :=
 do let n := decl.name,
    let mk_constr : name → expr := λ n', (const (n'.update_prefix $ n <.> "head_t") decl.u_params).mk_app $ func.dead_params.map prod.fst,
    let head_t : expr := const (n <.> "head_t") decl.u_params,
@@ -335,24 +333,27 @@ do let n := decl.name,
                  pure { name := (d.name.append_after i).update_prefix $ n <.> "child_t"  ++ l.1.local_pp_name,
                         args := vs' ++ args', result := [(mk_constr d.name).mk_app vs'], .. d } } : tactic _),
         idx ← (mk_local_def `i $ head_t.mk_app $ func.dead_params.map prod.fst : tactic _),
-        let decl' := { name := child_n, params := func.dead_params.map prod.fst, idx := decl.idx ++ [idx], ctors := cs.join, .. decl },
-        decl' <$ mk_inductive' decl'
+        let decl' := { name := child_n,
+                       params := func.dead_params.map prod.fst,
+                       idx := decl.idx ++ [idx],
+                       ctors := cs.join, .. decl },
+        decl' <$ mk_inductive decl'
 
-meta def inductive_type.of_pfunctor (func : internal_mvfunctor) : lean.parser inductive_type :=
-do -- mk_inductive' func.induct,
-   let d := func.decl,
+meta def inductive_type.of_pfunctor (func : internal_mvfunctor) : tactic inductive_type :=
+do let d := func.decl,
    let params := func.params,
    (idx,t) ← unpi (d.type.instantiate_pi params),
    env ← get_env,
-   -- let (params,idx) := idx.split_at $ env.inductive_num_params d.to_name,
    cs ← (env.constructors_of d.to_name).mmap $ λ c : name,
    do { let e := @const tt c d.univ_levels,
         t ← infer_type $ e.mk_app params,
         (vs,t) ← unpi t,
+        let infer := implicit_infer_kind_of $ vs.take params.length,
         pure (t.get_app_fn.const_name,{ type_cnstr .
                name := c,
                args := vs,
-               result := t.get_app_args.drop $ env.inductive_num_params d.to_name }) },
+               result := t.get_app_args.drop $ env.inductive_num_params d.to_name,
+               infer  := infer }) },
    pure { pre     := func.induct.pre,
           name    := d.to_name,
           u_names := d.univ_params,
@@ -360,39 +361,28 @@ do -- mk_inductive' func.induct,
           idx     := idx, type := t,
           ctors   := cs.map prod.snd }
 
-meta def mk_child_t_vec (decl : inductive_type) (func : internal_mvfunctor) (vs : list inductive_type) : lean.parser expr :=
+meta def mk_child_t_vec (decl : inductive_type) (func : internal_mvfunctor) (vs : list inductive_type) : tactic expr :=
 do let n := decl.name,
    let head_t := (@const tt (n <.> "head_t") func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst,
    let child_n := (n <.> "child_t"),
    let arity := func.live_params.length,
-   punit.star ← coe $
-     do { hd_v ← mk_local_def `hd head_t,
-          (expr.sort u') ← pure decl.type,
-          let u := u'.pred,
-          let vec_t := @const tt ``typevec [u] (reflect arity),
-          t ← pis (func.dead_params.map prod.fst ++ [hd_v]) vec_t,
-          nil ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
-          vec ← func.live_params.reverse.mfoldr (λ e v,
-            do c ← mk_const $ child_n ++ e.1.local_pp_name,
-               let c := (@const tt (n <.> "child_t" ++ e.1.local_pp_name) func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst ++ [hd_v],
-               mv ← mk_mvar,
-               unify_app (const ``append1 [u]) [mv,v,c]) nil,
-          -- vec ← mk_mapp ``_root_.id [vec_t,vec],
-          df ← (instantiate_mvars vec >>= lambdas (func.dead_params.map prod.fst ++ [hd_v]) : tactic _),
-          -- df ← instantiate_mvars vec,
-          let r := reducibility_hints.regular 1 tt,
-          add_decl' $ declaration.defn child_n func.decl.univ_params t df r tt,
-          -- pure { eqn_compiler.fun_def .
-          --        univs := func.induct.u_names,
-          --        name := child_n,
-          --        params := func.dead_params.map prod.fst ++ [hd_v],
-          --        type := vec_t,
-          --        body := eqn_compiler.def_body.term df }
-          pure () },
-   -- eqn_compiler.add_fn func.decl.to_name eqns,
+   hd_v ← mk_local_def `hd head_t,
+   (expr.sort u') ← pure decl.type,
+   let u := u'.pred,
+   let vec_t := @const tt ``typevec [u] (reflect arity),
+   t ← pis (func.dead_params.map prod.fst ++ [hd_v]) vec_t,
+   nil ← mk_mapp ``fin'.elim0 [some $ expr.sort u.succ],
+   vec ← func.live_params.reverse.mfoldr (λ e v,
+     do c ← mk_const $ child_n ++ e.1.local_pp_name,
+        let c := (@const tt (n <.> "child_t" ++ e.1.local_pp_name) func.decl.univ_levels).mk_app $ func.dead_params.map prod.fst ++ [hd_v],
+        mv ← mk_mvar,
+        unify_app (const ``append1 [u]) [mv,v,c]) nil,
+   df ← (instantiate_mvars vec >>= lambdas (func.dead_params.map prod.fst ++ [hd_v]) : tactic _),
+   let r := reducibility_hints.regular 1 tt,
+   add_decl' $ declaration.defn child_n func.decl.univ_params t df r tt,
    pure $ expr.const child_n $ func.induct.u_params
 
-meta def mk_pfunctor (func : internal_mvfunctor) : lean.parser unit :=
+meta def mk_pfunctor (func : internal_mvfunctor) : tactic unit :=
 do d ← inductive_type.of_pfunctor func,
    hd ← mk_head_t d func,
    ch ← mk_child_t d func,
@@ -806,20 +796,18 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
 
 open interactive lean.parser lean
 
-@[user_command]
-meta def qpf_decl (meta_info : decl_meta_info) (_ : parse (tk "qpf")) : parser unit :=
-do d ← inductive_decl.parse meta_info,
-   func ← mk_internal_functor' d,
-   trace_error $ mk_mvfunctor_instance func,
+@[user_attribute]
+meta def qpf_attribute : user_attribute :=
+{ name := `qpf,
+  descr := "derive qpf machinery for inductive type",
+  after_set := some $ λ n p t,
+do func ← mk_internal_functor n,
+   mk_mvfunctor_instance func,
    mk_pfunctor func,
-   trace_error $ mk_pfunc_constr func,
-   trace_error $ mk_pfunc_recursor func,
-   -- trace_error $ mk_pfunc_rec_eqns func,
-   -- mk_pfunc_map func,
-   -- mk_pfunc_mvfunctor_instance func,
-   trace_error $ mk_mvqpf_instance func,
+   mk_pfunc_constr func,
+   mk_pfunc_recursor func,
+   mk_mvqpf_instance func,
    pure ()
-
--- local attribute [user_command]  qpf_decl
+ }
 
 end tactic

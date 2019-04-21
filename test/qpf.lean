@@ -10,14 +10,16 @@ universes u_1 u_2 u_3
 set_option trace.app_builder true
 set_option pp.universes true
 
-qpf list_F'' (α β : Type)
+@[qpf]
+inductive list_F'' (α β : Type)
 | cons : ℤ → (ℕ → α) → (list ℕ → α) → (ℤ → β) → list_F''
 | a : α → list_F''
 | b : β → list_F''
 | nil : list_F''
 -- #exit
 -- @[derive mvqpf]
-qpf list_F (α : Type)
+@[qpf]
+inductive list_F (α : Type)
 | nil : list_F
 | cons : ℤ → α → list_F
 
@@ -107,7 +109,8 @@ set_option trace.app_builder true
 set_option pp.universes true
 
 -- @[derive mvqpf]
-qpf list_F''_ (α β γ : Type u)
+@[qpf]
+inductive list_F''_ (α β γ : Type u)
 | nil : (β → γ) → list_F''_
 | cons : (α → β) → list_F''_
 
@@ -150,7 +153,8 @@ qpf list_F''_ (α β γ : Type u)
 -- list_F''.internal.map._equation_1
 
 -- @[derive mvqpf]
-qpf list_F''' (α β γ : Type u)
+@[qpf]
+inductive list_F''' (α β γ : Type u)
 | nil : list_F'''
 | cons : (γ → β) → list_F'''
 
@@ -194,9 +198,10 @@ qpf list_F''' (α β γ : Type u)
 -- list_F'''.internal.map._equation_1
 
 -- @[derive mvqpf]
-qpf list_F'''' (α β γ : Type u)
-| nil : (β → γ) → (γ → α) → list_F''''
-| cons : (α → β) → list_F''''
+@[qpf]
+inductive list_F'''' (α β γ : Type u)
+| nil  : (β → γ) → (γ → α) → list_F''''
+| cons {} : (α → β) → list_F''''
 
 -- #print prefix hidden.list_F''''
 -- #check hidden.list_F''''.pfunctor.cons
@@ -227,7 +232,7 @@ list_F''''.internal.map._equation_0
 example : ∀ (α : Type u_1) (β : Type u_1) (γ : Type u_1) (a : α → β),
   list_F''''.internal.map α β γ (⦃ ⦄) ( ⦃ ⦄ ) typevec.nil_fun
       _ =
-    list_F''''.cons γ (λ (a_1 : α), a a_1) :=
+    list_F''''.cons (λ (a_1 : α), a a_1) :=
 list_F''''.internal.map._equation_1
 
 -- data list

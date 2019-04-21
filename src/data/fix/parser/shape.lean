@@ -8,10 +8,11 @@ namespace tactic
 open interactive lean lean.parser
 
 meta def replace_rec_occ (tn tn' : name) (nested : expr) (var : expr) : type_cnstr → type_cnstr
-| (tactic.type_cnstr.mk name args result) :=
+| (tactic.type_cnstr.mk name args result infer) :=
 { name := name.replace_prefix tn tn',
   args := args.map $ λ e, expr.replace e $ λ e' _, if e' = nested then pure var else none,
-  result := result.map $ λ e, expr.replace e $ λ e' _, if e' = nested then pure var else none }
+  result := result.map $ λ e, expr.replace e $ λ e' _, if e' = nested then pure var else none,
+  infer := infer }
 
 open expr interactive
 
@@ -30,11 +31,11 @@ do v ← mk_local_def (fresh_univ (d.params.map expr.local_pp_name) `α) d.type,
               type := d.type,
               ctors := d.ctors.map (replace_rec_occ d.name (d.name <.> "shape") c' v) })
 
-meta def mk_shape_functor' (d : interactive.inductive_decl) : lean.parser (datatype_shape × internal_mvfunctor) :=
+meta def mk_shape_functor' (d : interactive.inductive_decl) : tactic (datatype_shape × internal_mvfunctor) :=
 do d ← inductive_type.of_decl d,
    func' ← internalize_mvfunctor d,
    (v,func) ← mk_shape_decl d,
-   mk_inductive' func,
+   mk_inductive func,
    func ← internalize_mvfunctor func,
    mk_internal_functor_def func,
    mk_internal_functor_eqn func,
@@ -60,7 +61,7 @@ do let dead := func.dead_params.map prod.fst,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()
 
-meta def mk_datatype (iter : name) (d : inductive_decl) : parser (datatype_shape × internal_mvfunctor) :=
+meta def mk_datatype (iter : name) (d : inductive_decl) : tactic (datatype_shape × internal_mvfunctor) :=
 do (func', d) ← mk_shape_functor' d,
    let func : internal_mvfunctor := { .. func' },
    mk_mvfunctor_instance func,
