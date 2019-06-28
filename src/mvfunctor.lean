@@ -79,10 +79,10 @@ variables {n : ℕ} {α β γ : typevec.{u} n} {F : typevec.{u} n → Type v} [m
 def liftp {α : typevec n} (p : Π i, α i → Prop) : F α → Prop :=
 λ x, ∃ u : F (λ i, subtype (p i)), (λ i, @subtype.val _ (p i)) <$$> u = x
 
-def liftr {α : typevec n} (r : Π {i}, α i → α i → Prop) : F α → F α → Prop :=
-λ x y, ∃ u : F (λ i, {p : α i × α i // r p.fst p.snd}),
-  (λ i (t : {p : α i × α i // r p.fst p.snd}), t.val.fst) <$$> u = x ∧
-  (λ i (t : {p : α i × α i // r p.fst p.snd}), t.val.snd) <$$> u = y
+def liftr {α β : typevec n} (r : Π {i}, α i → β i → Prop) : F α → F β → Prop :=
+λ x y, ∃ u : F (λ i, {p : α i × β i // r p.fst p.snd}),
+  (λ i (t : {p : α i × β i // r p.fst p.snd}), t.val.fst) <$$> u = x ∧
+  (λ i (t : {p : α i × β i // r p.fst p.snd}), t.val.snd) <$$> u = y
 
 def supp {α : typevec n} (x : F α) (i : fin' n) : set (α i) :=
 { y : α i | ∀ {p}, liftp p x → p i y }

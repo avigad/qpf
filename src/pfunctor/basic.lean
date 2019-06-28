@@ -18,10 +18,10 @@ variables {F : Type u → Type u} [functor F]
 def liftp {α : Type u} (p : α → Prop) : F α → Prop :=
 λ x, ∃ u : F (subtype p), subtype.val <$> u = x
 
-def liftr {α : Type u} (r : α → α → Prop) : F α → F α → Prop :=
-λ x y, ∃ u : F {p : α × α // r p.fst p.snd},
-  (λ t : {p : α × α // r p.fst p.snd}, t.val.fst) <$> u = x ∧
-  (λ t : {p : α × α // r p.fst p.snd}, t.val.snd) <$> u = y
+def liftr {α β : Type u} (r : α → β → Prop) : F α → F β → Prop :=
+λ x y, ∃ u : F {p : α × β // r p.fst p.snd},
+  (λ t : {p : α × β // r p.fst p.snd}, t.val.fst) <$> u = x ∧
+  (λ t : {p : α × β // r p.fst p.snd}, t.val.snd) <$> u = y
 
 def supp {α : Type u} (x : F α) : set α := { y : α | ∀ ⦃p⦄, liftp p x → p y }
 
