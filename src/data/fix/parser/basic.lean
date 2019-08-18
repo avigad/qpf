@@ -797,10 +797,10 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
        done },
      t ← pis ((func.params ++ fs).map to_implicit) t,
      trace t,
-     df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
+     -- df ← instantiate_mvars df >>= lambdas (func.params ++ fs),
      add_decl $ declaration.thm (c.name.append_suffix "_liftp") func.induct.u_names t df },
-
    skip
+
 #check @typevec.liftr'
 meta def mk_liftr_eqns (func : internal_mvfunctor) : tactic unit :=
 do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.params,
@@ -813,6 +813,7 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
    fs ← live_params.mmap $ λ v,
      do { v ← mk_local_def `f $ v.imp $ v.imp `(Prop),
           mk_mapp ``function.uncurry [none,none,none,v] },
+   let internal_eq' := (@const tt func.eqn_name func.induct.u_params).mk_app func.params,
    let m := rb_map.of_list $ list.zip live_params fs,
    fv ← mk_map_vec func.vec_lvl level.zero fs,
    fv_map ← fs.mmap (λ f, mk_mapp ``subtype.val [none,f]) >>= mk_map_vec func.vec_lvl func.vec_lvl,
@@ -821,23 +822,28 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
    let n := func.live_params.length,
    -- mk_const ``typevec.liftp' >>= trace_expr,
    -- trace_expr v, trace_expr fv,
-   df ← mk_mapp ``typevec.liftr' [`(n),F,none,v] >>= trace_expr,
+   df ← mk_mapp ``typevec.liftr' [`(n),F,none,v],
    let df := df fv,
    -- unify_app df [fv] >>= trace_expr,
    -- df ← mk_mapp ``typevec.liftr' [`(n),F,none,v,fv],
    -- trace " - here - ",
    func.induct.ctors.mmap $ λ c, do
    { args ← c.args.mmap renew,
-     let e₀ := (@const tt c.name func.induct.u_params).mk_app $ func.params ++ c.args,
-     let e₁ := (@const tt c.name func.induct.u_params).mk_app $ func.params ++ args,
+     let constr := @const tt c.name func.induct.u_params,
+     let e₀ := constr.mk_app $ func.params ++ c.args,
+     let e₁ := constr.mk_app $ func.params ++ args,
+     args' ← mzip_with (λ a b, mk_app ``prod.mk [a,b]) c.args args,
+     let e₂ := constr.mk_app $ func.params ++ args',
      x₀ ← mk_eq_mpr internal_eq e₀,
      x₁ ← mk_eq_mpr internal_eq e₁,
+     x₂ ← mk_eq_mpr internal_eq e₂,
+     trace_expr x₂,
      trace "•",
      args' ← mzip_with (λ arg₀ arg₁ : expr, do
        { (args,rhs_t) ← infer_type arg₀ >>= mk_local_pis,
          (some f) ← pure $ m.find rhs_t | pure [],
          list.ret <$> pis args (f (arg₀.mk_app args) (arg₁.mk_app args) ) } ) c.args args,
-     trace "•",
+     trace "• 2",
      let rhs := mk_conj args'.join,
      t ← pis ((c.args ++ args).map to_implicit) $ rhs.imp (df x₀ x₁),
      trace t,
@@ -846,10 +852,16 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
        { args ← intron' c.args.length,
          mk_const ``typevec.liftr_def >>= rewrite_target,
          dunfold_target [``mvfunctor.map],
+         -- `[simp only with typevec],
          h ← intro `h,
          t ← infer_type h,
          let n := func.live_params.length,
+         trace "• • •",
          x ← mk_mapp ``subtype_ [`(n),none,fv],
+         trace_expr x, trace_expr fv,
+         trace_state,
+         existsi x₂,
+         trace "•",
          trace_state, done,
          -- y ← mk_mapp ``typevec.subtype_val [`(n),none,fv],
          -- h' ← assertv `h' (replace_all t [(x,fv_t),(y,fv_map)]) h, clear h,
@@ -899,6 +911,7 @@ do func ← mk_internal_functor n,
 end tactic
 
 set_option trace.app_builder true
-qpf tree' (α β : Type)
+@[qpf]
+inductive tree' (α β : Type)
 | nil : tree'
 | cons : α → (β → α) → tree'
