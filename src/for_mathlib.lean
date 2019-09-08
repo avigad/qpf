@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Simon Hudon
 -/
 import data.pfun category.functor category.applicative data.list.sort data.list.basic
+import category.bitraversable.instances
 
 universes u v
 
@@ -361,13 +362,6 @@ do (defn n _ t df _ _) ← get_decl n,
    t ← pp t, df ← pp df,
    trace format!"\ndef {n} : {t} :=\n{df}\n"
 
-meta def trace_error {α} (tac : tactic α) : tactic α :=
-λ s, match tac s with
-     | r@(result.success _ _) := r
-     | (result.exception (some msg) pos s') := (trace (msg ()) >> result.exception (some msg) pos) s'
-     | (result.exception none pos s') := (trace "no msg" >> result.exception none pos) s'
-     end
-
 meta def is_type (e : expr) : tactic bool :=
 do (expr.sort _) ← infer_type e | pure ff,
    pure tt
@@ -716,12 +710,6 @@ open lean lean.parser interactive interactive.types tactic
 
 local postfix `*`:9000 := many
 
-meta def clear_except (xs : parse ident *) : tactic unit :=
-do let ns := name_set.of_list xs,
-   local_context >>= mmap' (λ h : expr,
-     when (¬ ns.contains h.local_pp_name) $
-       try $ tactic.clear h) ∘ list.reverse
-
 meta def splita := split; [skip, assumption]
 
 @[hole_command]
@@ -791,6 +779,22 @@ meta def as_binder (e : expr) := fmt_binder e.local_pp_name e.binding_info (pars
 
 end expr
 
+meta def enclosing_name : tactic unit :=
+do n ← tactic.decl_name,
+   tactic.exact `(n)
+
+meta def on_error {α β} (tac : tactic α) (hdl : tactic β) : tactic α
+| s := match tac s with
+       | (result.success a a_1) := result.success a a_1
+       | (result.exception a a_1 s) := (hdl >> result.exception a a_1) s
+       end
+
+meta def trace_scope {α} (tac : tactic α) (n : name . enclosing_name) : tactic α :=
+do trace!"• begin {n}",
+   r ← on_error tac (trace!"• error in {n}"),
+   trace!"• end {n}",
+   pure r
+
 meta def stack_trace : vm_monitor ℕ :=
 { init := 0,
   step := λ i,
@@ -799,6 +803,9 @@ meta def stack_trace : vm_monitor ℕ :=
        fn ← vm.curr_fn,
        vm.put_str $ (list.repeat ' ' j).as_string ++ fn.to_string,
        pure j }
+
+meta def list.to_rb_set {α} [has_lt α] [decidable_rel ((<) : α → α → Prop)] (xs : list α) : native.rb_set α :=
+xs.foldl native.rb_set.insert (native.mk_rb_set)
 
 lemma mpr_mpr : Π {α β} (h : α = β) (h' : β = α) (x : α), h.mpr (h'.mpr x) = x
 | _ _ rfl rfl x := rfl
@@ -811,3 +818,73 @@ lemma mp_eq_of_eq_mpr : Π {α β} {h : α = β} {x : α} {y : β} (h' : x = h.m
 
 lemma mp_eq_of_heq : Π {α β} {h : α = β} {x : α} {y : β} (h' : x == y), h.mp x = y
 | _ _ rfl _ _ heq.rfl := rfl
+
+def reversed (m : Type u → Type v) := m
+def reversed.mk {m : Type u → Type v} {α} (x : m α) : reversed m α := x
+def reversed.run {m : Type u → Type v} {α} (x : reversed m α) : m α := x
+
+instance {m : Type u → Type v} [F : functor m] : functor (reversed m) := F
+instance {m : Type u → Type v} [functor m] [L : is_lawful_functor m] : is_lawful_functor (reversed m) := L
+
+instance {m : Type u → Type v} [applicative m] : applicative (reversed m) :=
+{ pure := λ α x, @pure m _ _ x,
+  map := λ α β f (x : m α), show m β, from f <$> x,
+  map_const := λ α β f (x : m _), show m α, from f <$ x,
+  seq := λ α β f x, show m β, from flip id <$> x <*> f }
+
+instance {m : Type u → Type v} [applicative m] [F : is_lawful_applicative m] : is_lawful_applicative (reversed m) :=
+{ map_const_eq := λ α β, @map_const_eq m _ _ α β,
+  pure_seq_eq_map := by intros; simp [(<*>),(<$>),pure,flip] with functor_norm,
+  map_pure := λ α β g x, @map_pure m _ _ _ _ g x,
+  seq_pure := by intros; simp [(<*>),(<$>),pure,flip] with functor_norm,
+  seq_assoc := by intros; simp [(<*>),(<$>),pure,flip] with functor_norm,
+  .. F.to_is_lawful_functor }
+
+attribute [irreducible] reversed
+
+def cache {α} (x : α) := { y : α // y = x }
+
+def cache.init {α} {x : α} : cache x := ⟨x,rfl⟩
+
+namespace tactic
+
+meta def init_cache : tactic unit :=
+refine ``(subtype.mk _ rfl)
+
+end tactic
+
+meta instance {α : Type*} [has_to_format α] {x : α} : has_to_format (cache x) :=
+subtype.has_to_format
+
+namespace list
+
+def mmap_reversed {t : Type u → Type u} [traversable t] {m : Type u → Type u} [applicative m] {α β} (f : α → m β) : t α → m (t β) :=
+reversed.run ∘ traverse (reversed.mk ∘ f)
+
+-- def mmap_if {m : Type u → Type u} [applicative m] {α} {β : Type} (p : β → Prop) [decidable_pred p] (f : α → m α) : α × β → m (α × β)
+-- | (x,y) := if p y then flip prod.mk y <$> f x else pure (x,y)
+open bitraversable
+variables {α β γ : Type u} {m : Type u → Type u} [monad m]
+
+meta def mmap_dead (f : α → m γ) (xs : α ⊕ β) : m (γ ⊕ β) :=
+tfst f xs
+
+meta def mmap_live (f : β → m γ) (xs : α ⊕ β) : m (α ⊕ γ) :=
+tsnd f xs
+
+meta def map_dead (f : α → γ) (xs : α ⊕ β) : (γ ⊕ β) :=
+sum.map f id xs
+
+meta def map_live (f : β → γ) (xs : α ⊕ β) : (α ⊕ γ) :=
+sum.map id f xs
+
+meta def mmap_dead' (f : α → m γ) (xs : list $ α ⊕ β) : m (list $ γ ⊕ β) :=
+xs.mmap (mmap_dead f)
+
+meta def mmap_live' (f : β → m γ) (xs : list $ α ⊕ β) : m (list $ α ⊕ γ) :=
+xs.mmap (mmap_live f)
+
+meta def mmap_reversed_live' (f : β → m γ) (xs : list $ α ⊕ β) : m (list $ α ⊕ γ) :=
+mmap_reversed (mmap_live f) xs
+
+end list
