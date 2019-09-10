@@ -965,7 +965,7 @@ lemma apply_curried {α β} {f : α → β → Sort*} : Π {x : α} {y : β}, f 
 | x y := id
 
 meta def intro_local_def (n : name) (t : expr) : tactic expr :=
-do `(true) ← target | fail "expecting trivial goal",
+do `(true) ← (↑`(true) <$ done) <|> target | fail "expecting trivial goal",
    v ← mk_meta_var $ pi n binder_info.default t `(true),
    set_goals [v],
    intro1

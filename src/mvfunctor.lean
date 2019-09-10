@@ -390,7 +390,7 @@ protected def const {β} (x : β) : Π {n} (α : typevec n), α ⟹ repeat _ β
 open function (uncurry)
 
 def repeat_eq : Π {n} (α : typevec n), α ⊗ α ⟹ repeat _ Prop
-| 0 α := λ i, fin'.elim0 i
+| 0 α := nil_fun
 | (succ n) α := repeat_eq (drop α) ::: uncurry eq
 -- | (succ n) α (fin'.raise i) := repeat_eq (drop α) _
 -- | (succ n) α fin'.last := λ x, x.1 = x.2
@@ -401,9 +401,11 @@ by ext i : 1; cases i; refl
 lemma const_nil {β} (x : β) (α : typevec 0) : typevec.const x α = nil_fun :=
 by ext i : 1; cases i; refl
 
+@[typevec]
 lemma repeat_eq_append1 {β} {n} (α : typevec n) : repeat_eq (α ::: β) = split_fun (repeat_eq α) (uncurry eq) :=
 by induction n; refl
 
+@[typevec]
 lemma repeat_eq_nil (α : typevec 0) : repeat_eq α = nil_fun :=
 by ext i : 1; cases i; refl
 
@@ -479,6 +481,8 @@ mvfunctor.liftr $ λ i x y, of_repeat $ r i $ prod.mk _ x y
 
 def append_fun' {α : typevec' n} {β β' : Type*}
   (f : α ⟹ repeat n β') (g : β → β') : append1 α β ⟹ repeat n.succ β' := split_fun f g
+
+lemma d  {α α' : typevec' 1} {β β' : Type*} (f : last α → last α') : @split_fun 0 α α' nil_fun f = nil_fun ::: f := _
 
 variables [mvfunctor.is_lawful F] (F)
 

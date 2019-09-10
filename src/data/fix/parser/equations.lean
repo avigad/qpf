@@ -25,9 +25,9 @@ do let my_t := (@const tt d.induct.name d.induct.u_params).mk_app d.params,
 meta def mk_destr (dest_fn mk_fn mk_dest_eqn : name) (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let params := d.params.map to_implicit,
    let my_t := (@const tt d.induct.name d.induct.u_params).mk_app params,
-   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [my_t]),
-   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
-   let my_shape_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   vec ← mk_live_vec d.vec_lvl (d.live_params ++ [my_t]),
+   vec' ← mk_live_vec d.vec_lvl d.live_params,
+   let my_shape_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let u_params := d.induct.u_params,
    let u := fresh_univ d.induct.u_names,
    let intl_eq := (@const tt (d.induct.name <.> "shape" <.> "internal_eq") u_params).mk_app params my_t,
@@ -56,7 +56,7 @@ do let params := d.params.map to_implicit,
    let my_t := (@const tt d.induct.name d.induct.u_params).mk_app params,
    let u := fresh_univ d.induct.u_names,
    C ← mk_local' `C binder_info.implicit (my_t.imp (sort $ level.param u)),
-   let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app $ d.dead_params.map prod.fst,
+   let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app $ d.dead_params,
    let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app params my_t,
    C' ← mk_local' `C binder_info.implicit (my_shape_t.imp (sort $ level.param u)),
    let cases_on := @const tt (d.induct.name <.> "cases_on") (level.param u :: d.induct.u_params),
@@ -68,7 +68,7 @@ do let params := d.params.map to_implicit,
    h ← mk_app `eq [c,c'] >>= mk_local_def `h,
    t ← mk_mapp `heq [none,shape_cases_on.mk_app $ c :: vs',none,shape_cases_on.mk_app $ c' :: vs']
      >>= pis [c,c',h] >>= pis (C' :: vs') >>= pis params,
-   (_,cases_congr) ← solve_aux t $ prove_goal_async (intros >> cc),
+   (_,cases_congr) ← solve_aux t (intros >> cc),
    (d.induct.ctors.zip vs).mmap' $ λ ⟨ctor,v⟩,
    do { let c := ((@const tt ctor.name d.induct.u_params).mk_app params).mk_app ctor.args,
         eqn ← mk_app `eq [cases_on.mk_app $ c::vs,v.mk_app ctor.args],
@@ -91,13 +91,13 @@ open interactive.rw_rule
 
 meta def mk_dep_recursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
 do let params := d.params.map to_implicit,
-   let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+   let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let u_params := d.induct.u_params,
-   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
+   vec' ← mk_live_vec d.vec_lvl d.live_params,
    arg ← mk_local_def `y ((@const tt d.induct.name d.induct.u_params).mk_app params),
    C ← pis [arg] d.type >>= mk_local' `C binder_info.implicit,
    X ← mk_app ``sigma [C],
-   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [X]),
+   vec ← mk_live_vec d.vec_lvl (d.live_params ++ [X]),
    let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app params X,
    v_t ← mk_local_def `x my_shape_t,
    x ← mk_local_def `x' (my_shape_intl_t vec),
@@ -122,13 +122,13 @@ do let params := d.params.map to_implicit,
    pure ()
 
 meta def mk_recursor (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
-do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app func.params,
    let u_params := d.induct.u_params,
    let X := to_implicit func.hole,
    let intl_eq := (@const tt (d.induct.name <.> "shape" <.> "internal_eq") u_params).mk_app d.params X,
-   vec' ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst),
-   vec ← mk_live_vec d.vec_lvl (d.live_params.map prod.fst ++ [X]),
+   vec' ← mk_live_vec d.vec_lvl d.live_params,
+   vec ← mk_live_vec d.vec_lvl (d.live_params ++ [X]),
    x ← mk_local_def `x (my_shape_intl_t vec),
    v_t ← mk_local_def `x my_shape_t,
    C ← lambdas [v_t] X,
@@ -152,13 +152,13 @@ meta def mk_corecursor (func : datatype_shape) (d : internal_mvfunctor) : tactic
 do let u := fresh_univ d.induct.u_names,
    let t := (@const tt d.decl.to_name d.induct.u_params).mk_app d.params,
    let x := func.hole,
-   v ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst,
-   v' ← mk_live_vec d.vec_lvl $ x :: d.live_params.map prod.fst,
+   v ← mk_live_vec d.vec_lvl $ d.live_params,
+   v' ← mk_live_vec d.vec_lvl $ x :: d.live_params,
    let u_params := d.induct.u_params,
    let n := d.decl.to_name,
    let shape_n := n <.> "shape",
    let internal_eq_n := shape_n <.> "internal_eq",
-   let t' := (@const tt (shape_n <.> "internal") d.induct.u_params).mk_app $ func.dead_params.map prod.fst,
+   let t' := (@const tt (shape_n <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let intl_eq := (@const tt internal_eq_n u_params).mk_app $ d.params,
    let my_fun (rec_n rec_n' : name) (a : expr) := do
    { let ft := imp x $ (@const tt shape_n u_params).mk_app d.params a,
@@ -185,11 +185,11 @@ do t ← infer_type e >>= instantiate_mvars,
    return (parse_conjunction_aux id t e).to_list
 
 meta def mk_ind (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
-do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let my_t := (@const tt (d.induct.name) d.induct.u_params).mk_app d.params,
    let my_shape_t := (@const tt (d.induct.name <.> "shape") d.induct.u_params).mk_app $ d.params,
-   v' ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst,
-   v ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst ++ [my_t],
+   v' ← mk_live_vec d.vec_lvl d.live_params,
+   v ← mk_live_vec d.vec_lvl $ d.live_params ++ [my_t],
    yy ← mk_local_def `y (my_shape_intl_t v),
    x ← mk_local_def `x my_t,
    p ← mk_local_def `p (my_t.imp `(Prop)),
@@ -249,10 +249,28 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    add_decl $ declaration.thm (d.induct.name <.> "ind") d.induct.u_names t (pure df),
    skip
 
+meta def mk_last_rel' : list (expr ⊕ expr) → tactic (bool × list (expr ⊕ expr × expr))
+| [] := pure (ff,[])
+| (sum.inl x :: xs) :=
+  prod.map id (list.cons $ sum.inl x) <$> mk_last_rel' xs
+| (sum.inr x :: xs) :=
+  do (b,ys) ← mk_last_rel' xs,
+     if b then do
+       R ← mk_mapp ``eq [x],
+       pure (tt,sum.inr (x, R) :: ys)
+     else do
+       R ← mk_rel_var x,
+       pure (tt,sum.inr R :: ys)
+
+meta def mk_last_rel : list (expr ⊕ expr) → tactic (list (expr ⊕ expr × expr)) :=
+(<$>) prod.snd ∘ mk_last_rel'
+
+-- #exit
 meta def mk_bisim (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
-do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app (func.dead_params.map prod.fst),
+trace_scope $ do
+do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") d.induct.u_params).mk_app func.dead_params,
    let my_t := (@const tt (d.induct.name) d.induct.u_params).mk_app d.params,
-   v' ← mk_live_vec d.vec_lvl $ d.live_params.map prod.fst,
+   v' ← mk_live_vec d.vec_lvl d.live_params,
    x ← mk_local_def `x my_t,
    y ← mk_local_def `y my_t,
    x' ← mk_app ``mvqpf.cofix.dest [x],
@@ -260,11 +278,41 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    r ← mk_local_def `r (my_t.imp $ my_t.imp `(Prop)),
    r' ← mk_mapp ``typevec.rel_last [none,v',none,none,r],
    hr ← mk_local_def `a (r x y),
-   R ← mk_app ``mvfunctor.liftr [r',x',y'],
-   f ← pis [x,y,hr] R >>= mk_local_def `f,
-   trace_expr f,
-   df ← mk_mapp ``mvqpf.cofix.bisim [none,my_shape_intl_t,none,none,v',r,f,x,y,hr]
-      >>= lambdas' [d.params, [r,f,x,y,hr]],
+   trace "\n\n\n• foo",
+   params ← mk_last_rel func.params',
+   -- trace params,
+   -- mk_const (func.induct.name ++ "liftr") >>= trace_expr,
+   -- trace_expr r', trace_expr x', trace_expr y',
+   -- trace_expr x, trace_expr y,
+   let R := (@const tt (func.induct.name ++ "liftr") func.univ_params).mk_app (params.bind decls') x y,
+   -- trace_expr R,
+   -- R ← mk_app (func.induct.name ++ "liftr") [r',x',y'],
+   R' ← mk_app ``mvfunctor.liftr [r',x',y'],
+   f ← pis [x,y,hr] R >>= intro_local_def `f,
+   f' ← pis [x,y,hr] R' >>= mk_meta_var,
+   -- trace_expr f,
+   set_goals [f'],
+   mk_const (func.induct.name ++ "liftr_iff") >>= trace_expr ∘ flip id [params.bind decls',[x,y]] ∘ expr.mk_app',
+   solve1 $ do
+   { xs ← introv [], hh ← intro `hh,
+     let f' := (f.mk_app xs hh),
+     t ← infer_type f' >>= instantiate_mvars,
+     f ← assertv `f t f',
+     h ← mk_const ``typevec.liftr_last_rel_iff,
+     rewrite_target h { symm := tt }, trace_state,
+     `[simp only [typevec.rel_last'] with typevec], trace_state,
+     -- rule ← mk_const (func.induct.name ++ "liftr_iff"),
+     let rule := (@const tt (func.induct.name ++ "liftr_iff") func.univ_params).mk_app' [params.bind decls',[x,y]],
+     mk_mapp ``iff.mpr [none,none,rule] >>= exact ∘ flip id f ∘ coe_fn,
+     rewrite_hyp rule f { symm := tt },
+     trace_state,
+     -- mk_const (func.induct.name ++ "liftr_iff") >>= rewrite_target,
+     trace_state },
+   df ← mk_mapp ``mvqpf.cofix.bisim [none,my_shape_intl_t,none,none,v',r,f'] -- ,f,x,y,hr
+      -- >>= lambdas' [d.params, [r,f,x,y,hr]],
+   ,
+   trace_expr df,
+   (fail "• here •" : tactic unit),
    t  ← mk_app `eq [x,y] >>= pis' [d.params, [r,f,x,y,hr]],
    f ← add_decl' $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
    -- let r := (@const tt (d.induct.name <.> "bisim_rel") d.induct.u_params).mk_app d.params,
@@ -302,6 +350,7 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
 
 open environment.implicit_infer_kind
 meta def mk_bisim_rel (func : datatype_shape) (d : internal_mvfunctor) : tactic unit :=
+trace_scope $
 do let params := d.params.map to_implicit,
    let t := (@const tt d.induct.name d.induct.u_params).mk_app params,
    let n := d.induct.name <.> "bisim_rel",
@@ -337,7 +386,7 @@ do let params := d.params.map to_implicit,
    add_coinductive_predicate decl.u_names decl.params [(sig,intros)]
 
 meta def mk_fix_functor_instance (func : internal_mvfunctor) : tactic unit :=
-do let params := func.dead_params.map prod.fst,
+do let params := func.dead_params,
    let c := (@const tt func.def_name func.induct.u_params).mk_app params,
    let shape_c := (@const tt (func.induct.name <.> "shape" <.> "internal") func.induct.u_params).mk_app params,
    t ← mk_app ``mvfunctor [c] >>= pis params,
@@ -350,7 +399,7 @@ do let params := func.dead_params.map prod.fst,
    set_basic_attribute `instance (func.induct.name <.> "mvqpf")
 
 meta def mk_cofix_functor_instance (func : internal_mvfunctor) : tactic unit :=
-do let params := func.dead_params.map prod.fst,
+do let params := func.dead_params,
    let c := (@const tt func.def_name func.induct.u_params).mk_app params,
    let shape_c := (@const tt (func.induct.name <.> "shape" <.> "internal") func.induct.u_params).mk_app params,
    t ← mk_app ``mvfunctor [c] >>= pis params,
@@ -363,9 +412,9 @@ do let params := func.dead_params.map prod.fst,
    set_basic_attribute `instance (func.induct.name <.> "mvqpf")
 
 @[user_command]
-meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
+meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
-   trace_error $ do
+   trace_error "bad" (do
      (func,d) ← mk_datatype ``mvqpf.fix d,
      mk_liftp_eqns func.to_internal_mvfunctor,
      mk_constr ``mvqpf.fix.mk d,
@@ -377,42 +426,74 @@ do d ← inductive_decl.parse meta_info,
      mk_ind func d,
      mk_no_confusion_type d.induct,
      mk_no_confusion d.induct,
-     pure ()
+     pure ())
 
-#check @timetac
+-- #check @timetac
 
 @[user_command]
-meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
+meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
-   (func,d) ← mk_datatype ``mvqpf.cofix d,
-   mk_liftp_eqns func.to_internal_mvfunctor,
-   mk_constr ``mvqpf.cofix.mk d,
-   mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
-   mk_destr_constr_eqn ``mvqpf.cofix.dest_mk func d,
-   mk_corecursor func d,
-   mk_cofix_functor_instance d,
-   mk_bisim_rel func d,
-   mk_bisim func d,
-   mk_no_confusion_type d.induct,
-   mk_no_confusion d.induct,
-   pure ()
+   trace_error "bad" (do
+     (func,d) ← mk_datatype ``mvqpf.cofix d,
+     mk_liftp_eqns func.to_internal_mvfunctor,
+     mk_constr ``mvqpf.cofix.mk d,
+     mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
+     mk_destr_constr_eqn ``mvqpf.cofix.dest_mk func d,
+     mk_corecursor func d,
+     mk_cofix_functor_instance d,
+     mk_bisim_rel func d,
+     mk_bisim func d,
+     mk_no_confusion_type d.induct,
+     mk_no_confusion d.induct,
+     pure ())
 
 end tactic
--- set_option trace.app_builder true
-codata tree' (α β : Type)
-| nil : tree'
-| cons : α → (β → tree') → tree'
+set_option trace.app_builder true
+set_option pp.implicit true
+codata tree (α β : Type)
+| nil : tree
+| cons : α → (β → tree) → tree
 
 codata part (α : Type)
 | pure : α → part
 | delay : part → part
 
+codata str (α : Type)
+| nil : str
+| cons : α → str → str
+
 #check part.corec
+#print prefix part
+#print prefix mvqpf.cofix
 def diverge {α} : part α :=
-part.corec _ unit (λ _, part.shape.delay _ ()) ()
+part.corec _ unit (λ _, part.shape.delay ()) ()
+
+def map {α β} (f : α → β) (x : str α) : str β :=
+str.corec _ _
+(λ x, @str.cases_on _ (λ _, str.shape β (str α)) x
+  str.shape.nil
+  (λ (x : α) (y : str α), str.shape.cons (f x) y))
+x
+
+def enum_from : ℕ → str ℕ :=
+str.corec _ _ (λ x, str.shape.cons x x.succ)
+
+
 #check part.bisim
 example {α} : @diverge α = part.delay _ diverge :=
 begin
-  -- apply part.bisim _ (λ _ _, true),
-  conv { to_lhs, rw diverge, }
+  conv { to_lhs, rw diverge, },
+  apply part.bisim _ (λ _ _, true),
+  dsimp,
+end
+
+#print prefix str
+
+example {x y} : enum_from (x + y) = map (λ z, z + y) (enum_from x) :=
+begin
+  apply str.bisim _ str.bisim_rel,
+  { clear x y, introv h,
+    apply str.bisim_rel.cases_on h,
+},
+  dsimp,
 end

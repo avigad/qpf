@@ -19,6 +19,10 @@ open expr interactive
 meta structure datatype_shape extends internal_mvfunctor :=
 (hole : expr)
 
+meta def datatype_shape.params (d : datatype_shape) := internal_mvfunctor.params d.to_internal_mvfunctor
+meta def datatype_shape.dead_params (d : datatype_shape) := internal_mvfunctor.dead_params d.to_internal_mvfunctor
+meta def datatype_shape.live_params (d : datatype_shape) := internal_mvfunctor.live_params d.to_internal_mvfunctor
+
 meta def mk_shape_decl (d : inductive_type) : tactic (expr × inductive_type) :=
 do v ← mk_local_def (fresh_univ (d.params.map expr.local_pp_name) `α) d.type,
    let c := @const tt d.name d.u_params,
@@ -49,14 +53,14 @@ meta def decl_kind : declaration → string
 
 
 meta def mk_fixpoint (fix : name) (func d : internal_mvfunctor) : tactic unit :=
-do let dead := func.dead_params.map prod.fst,
+do let dead := func.dead_params,
    let shape := (@const tt (func.decl.to_name <.> "internal") func.induct.u_params).mk_app dead,
    df ← (mk_mapp fix [none,shape,none,none] >>= lambdas dead : tactic _),
    t ← infer_type df,
    let intl_n := func.decl.to_name.get_prefix <.> "internal",
    add_decl $ mk_definition intl_n func.induct.u_names t df,
-   v ← mk_live_vec func.vec_lvl $ func.live_params.init.map prod.fst,
-   df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app (func.dead_params.map prod.fst) v,
+   v ← mk_live_vec func.vec_lvl $ func.live_params.init,
+   df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app func.dead_params v,
    t  ← infer_type df,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()
@@ -73,6 +77,12 @@ do (func', d) ← mk_shape_functor' d,
    timetac' "mk_pfunc_recursor" $ mk_pfunc_recursor func,
    timetac' "mk_mvqpf_instance" $ mk_mvqpf_instance func,
    timetac' "mk_fixpoint" $ mk_fixpoint iter func d,
+   mk_liftp_defn' func,
+   mk_liftp_eqns₀ func,
+   mk_liftp_eqns₁ func,
+   mk_liftr_defn' func,
+   mk_liftr_eqns₀ func,
+   mk_liftr_eqns₁ func,
    pure (func',d)
 
 end tactic
