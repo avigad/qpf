@@ -603,7 +603,7 @@ end M
 end pfunctor
 
 namespace tactic.interactive
-open tactic (hiding coinduction) lean.parser interactive
+open tactic (hiding coinduction) lean.parser interactive interactive.types
 
 meta def bisim (ids : parse $ types.with_ident_list) (g : parse $ optional (tk "generalizing" *> many ident)) : tactic unit :=
 do applyc ``pfunctor.M.coinduction,
