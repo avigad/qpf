@@ -11,32 +11,79 @@ universe u
 
 /- TODO (Jeremy): move this. -/
 
-namespace functor
+namespace fam
 
 variables {I J : Type u} {F : fam I ⥤ fam J}
 
+def Pred (α : fam I) : Sort* := ∀ i, α i → Prop
+
 @[reducible]
-def fam.subtype {α : fam I} (p : Π i, α i → Prop) : fam I :=
+def subtype {α : fam I} (p : Pred α) : fam I :=
 λ i, subtype (p i)
 
-def fam.subtype.val {α : fam I} (p : Π i, α i → Prop) : fam.subtype p ⟶ α :=
+def subtype.val {α : fam I} (p : Pred α) : fam.subtype p ⟶ α :=
 λ i, subtype.val
 
-def liftp {α : fam I} (p : Π i, α i → Prop) {X : fam J} : (X ⟶ F.obj α) → Prop :=
+def prod (α β : fam I) : fam I
+| i := α i × β i
+
+infix ` ⊗ `:35 := prod
+
+def prod.fst : Π {α β : fam I}, α ⊗ β ⟶ α
+| α β i x := _root_.prod.fst x
+
+def prod.snd : Π {α β : fam I}, α ⊗ β ⟶ β
+| α β i x := _root_.prod.snd x
+
+def prod.map {α β α' β' : fam I} : (α ⟶ β) → (α' ⟶ β') → (α ⊗ α' ⟶ β ⊗ β')
+| f g i x := (f x.1,g x.2)
+
+infix ` ⊗ `:35 := prod.map
+
+def diag : Π {α : fam I}, α ⟶ α ⊗ α
+| α i x := (x,x)
+
+end fam
+
+namespace pfunctor
+
+variables {I J : Type u} {F G : fam I ⥤ fam J}
+
+def liftp {α : fam I} (p : fam.Pred α) {X : fam J} : (X ⟶ F.obj α) → Prop :=
 λ x, ∃ u : X ⟶ F.obj (fam.subtype p), u ≫ F.map (fam.subtype.val p) = x
 
-def liftr {α β : fam I} (r : Π i, α i → β i → Prop) {X : fam J} : (X ⟶ F.obj α) → (X ⟶ F.obj β) → Prop :=
-λ x y, ∃ u : X ⟶ F.obj (λ i, {p : α i × β i // r i p.fst p.snd}),
-  u ≫ F.map (fam.subtype.val _ ≫ λ i, prod.fst) = x ∧
-  u ≫ F.map (fam.subtype.val _ ≫ λ i, prod.snd) = y
+def liftr {α β : fam I} (r : fam.Pred (α ⊗ β)) {X : fam J} : (X ⟶ F.obj α) → (X ⟶ F.obj β) → Prop :=
+λ x y, ∃ u : X ⟶ F.obj (fam.subtype r),
+  u ≫ F.map (fam.subtype.val _ ≫ fam.prod.fst) = x ∧
+  u ≫ F.map (fam.subtype.val _ ≫ fam.prod.snd) = y
 
 def supp {α : fam I} {X : fam J} (x : X ⟶ F.obj α) : set (sigma α) := { y : sigma α | ∀ ⦃p⦄, liftp p x → p _ y.2 }
 
-theorem of_mem_supp {α : fam I} {X : fam J} {x : X ⟶ F.obj α} {p : Π i, α i → Prop} (h : liftp p x) :
+theorem of_mem_supp {α : fam I} {X : fam J} {x : X ⟶ F.obj α} {p : fam.Pred α} (h : liftp p x) :
   ∀ y ∈ supp x, p _ (sigma.snd y) :=
 λ y hy, hy h
 
-end functor
+open category_theory
+
+lemma liftp_comp {α : fam I} {X : fam J} {p : Π i, α i → Prop}
+  (x : X ⟶ F.obj α) (h : F ⟶ G) :
+  liftp p x → liftp p (x ≫ h.app _)
+| ⟨u,h'⟩ := ⟨u ≫ nat_trans.app h _, by rw ← h'; simp,⟩
+
+lemma liftp_comp' {α : fam I} {X : fam J} {p : Π i, α i → Prop}
+  (x : X ⟶ F.obj α) (T : F ⟶ G) (T' : G ⟶ F)
+  (h_inv : ∀ {α}, T.app α ≫ T'.app α = 𝟙 _):
+  liftp p x ↔ liftp p (x ≫ T.app _) :=
+-- | ⟨u,h'⟩ :=
+⟨ liftp_comp x T,
+ λ ⟨u,h'⟩, ⟨u ≫ T'.app _,by rw [category.assoc,← nat_trans.naturality,← category.assoc,h',category.assoc,h_inv,category.comp_id]⟩ ⟩
+
+lemma liftr_comp {α : fam I} {X : fam J} (p : fam.Pred (α ⊗ α)) (x y : X ⟶ F.obj α)
+   (T : F ⟶ G) :
+  liftr p x y → liftr p (x ≫ T.app _) (y ≫ T.app _)
+| ⟨u,h,h'⟩ := ⟨u ≫ T.app _, by { rw ← h'; simp, }⟩
+
+end pfunctor
 
 /-
 A polynomial functor `P` is given by a type `A` and a family `B` of types over `A`. `P` maps
@@ -48,7 +95,7 @@ elements of `α`.
 -/
 
 structure pfunctor (I J : Type u) :=
-(A : J → Type u) (B : Π i, A i → I → Type u)
+(A : J → Type u) (B : Π i, A i → fam I)
 
 namespace pfunctor
 
@@ -121,6 +168,13 @@ by cases p; reflexivity
 by cases p; reflexivity
 
 variables {P}
+
+-- theorem Wp_ind {α : fam I} {C : Π i (x : P.A i), (P.B i x ⟶ α) → Prop}
+--   (ih : ∀ i (a : P.A i) (f : P.B i a ⟶ P.W)
+--     (f' : P.B i a ⟶ α),
+--       (∀ j (x : P.B _ a j), C j ((f : Π j, P.B i a j → P.W j) x) x) → C i ⟨a, f⟩ f') :
+--   Π i (x : P.last.W i) (f' : P.W_path x ⟶ α), C i x f'
+
 
 -- @[simp]
 -- lemma fst_map {α β : fam I} (x : P.apply.obj α _) (f : α ⟶ β) :
@@ -237,10 +291,6 @@ begin
     simp [(∘),fam.subtype.val], },
   introv hv, dsimp [liftp],
   mk_constructive hv,
-  -- replace hv := λ j k, (classical.indefinite_description' _ (hv j k)),
-  -- replace hv : Π (j : J) (k : X j),
-  --   Σ' (a : P.A j) (f : P.B j a ⟶ α), x j k = ⟨a, f⟩ ∧ ∀ (i : I) (a : P.B j a i), p i (f i a) :=
-  --   λ j k, psigma.map id (λ i h, classical.indefinite_description' _ h) (hv j k),
   let F₀ := λ j k, (hv j k).1,
   let F₁ : Π j k, P.B j (F₀ j k) ⟶ α := λ j k, (hv j k).2.1,
   have F₂ : ∀ j k, x k = ⟨F₀ j k,F₁ j k⟩ := λ j k, (hv j k).2.2.1,

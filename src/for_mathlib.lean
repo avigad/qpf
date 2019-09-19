@@ -709,6 +709,11 @@ open lean lean.parser interactive interactive.types tactic
 
 local postfix `*`:9000 := many
 
+-- meta def clear_except (xs : parse ident *) : tactic unit :=
+-- do let ns := name_set.of_list xs,
+--    local_context >>= mmap' (λ h : expr,
+--      when (¬ ns.contains h.local_pp_name) $
+--        try $ tactic.clear h) ∘ list.reverse
 
 meta def splita := split; [skip, assumption]
 
@@ -799,3 +804,38 @@ lemma mp_eq_of_eq_mpr : Π {α β} {h : α = β} {x : α} {y : β} (h' : x = h.m
 
 lemma mp_eq_of_heq : Π {α β} {h : α = β} {x : α} {y : β} (h' : x == y), h.mp x = y
 | _ _ rfl _ _ heq.rfl := rfl
+
+-- meta def local_simp_attr : user_attribute simp_lemmas :=
+-- let attr_deps : list name := [] in
+-- {name     := `local_simp,
+--  descr    := "simplifier attribute",
+--  cache_cfg := {
+--    mk_cache := λ ns, do {
+--             s ← tactic.to_simp_lemmas simp_lemmas.mk ns,
+--             s ← attr_deps.mfoldl
+--                   (λ s attr_name, do
+--                      ns ← attribute.get_instances attr_name,
+--                      tactic.to_simp_lemmas s ns)
+--                   s,
+--             return s },
+--    dependencies := `reducibility :: attr_deps}}
+
+-- -- do let t := `(user_attribute simp_lemmas),
+-- --    let v := `({name     := attr_name,
+-- --                descr    := "simplifier attribute",
+-- --                cache_cfg := {
+-- --                  mk_cache := λ ns, do {
+-- --                           s ← tactic.to_simp_lemmas simp_lemmas.mk ns,
+-- --                           s ← attr_deps.mfoldl
+-- --                                 (λ s attr_name, do
+-- --                                    ns ← attribute.get_instances attr_name,
+-- --                                    to_simp_lemmas s ns)
+-- --                                 s,
+-- --                           return s },
+-- --                  dependencies := `reducibility :: attr_deps}} : user_attribute simp_lemmas),
+-- --    let n := mk_simp_attr_decl_name attr_name,
+-- --    add_decl (declaration.defn n [] t v reducibility_hints.abbrev ff),
+-- --    attribute.register n
+
+-- -- local attribute [user_attribute] local_simp_attr
+-- run_cmd tactic.set_basic_attribute ``user_attribute `local_simp_attr ff

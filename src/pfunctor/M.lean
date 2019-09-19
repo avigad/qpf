@@ -603,11 +603,11 @@ end M
 end pfunctor
 
 namespace tactic.interactive
-open tactic (hiding coinduction) lean.parser interactive
+open tactic (hiding coinduction) lean.parser interactive interactive.types
 
-meta def bisim (g : parse $ optional (tk "generalizing" *> many ident)) : tactic unit :=
+meta def bisim (ns : parse with_ident_list) (g : parse $ optional (tk "generalizing" *> many ident)) : tactic unit :=
 do applyc ``pfunctor.M.coinduction,
-   coinduction ``pfunctor.M.R.corec_on g
+   coinduction ``pfunctor.M.R.corec_on ns g
 
 end tactic.interactive
 
@@ -633,7 +633,7 @@ lemma M_bisim (R : M P → M P → Prop)
   ∀ x y, R x y → x = y :=
 begin
   intros,
-  bisim generalizing x y, rename w x; rename h_1_w y; rename h_1_h_left ih,
+  bisim with _ _ ih generalizing x y, -- rename w x; rename h_1_w y; rename h_1_h_left ih,
   rcases h _ _ ih with ⟨ a', f, f', h₀, h₁, h₂ ⟩, clear h, dsimp [M_dest] at h₀ h₁,
   existsi [a',f,f'], split,
   { intro, existsi [f i,f' i,h₂ _,rfl], refl },
