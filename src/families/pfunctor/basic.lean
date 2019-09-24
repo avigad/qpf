@@ -7,9 +7,26 @@ Polynomial functors. Also expresses the W-type construction as a polynomial func
 (For the M-type construction, see Mtype.lean.)
 -/
 import tactic.interactive data.multiset families.pfunctor.family for_mathlib
-universe u
+universes v v' u u'
 
 /- TODO (Jeremy): move this. -/
+
+namespace category_theory
+
+namespace functor
+open category_theory
+variables {C : Type u} {D : Type u'} [category.{v} C] [category.{v'} D] (F : C ⥤ D)
+
+@[reassoc]
+lemma map_comp_map {X Y Z : C} (f : X ⟶ Y) (g : Y ⟶ Z) : F.map f ≫ F.map g = F.map (f ≫ g) :=
+(category_theory.functor.map_comp _ _ _).symm
+
+end functor
+
+end category_theory
+
+
+
 
 namespace fam
 
@@ -21,7 +38,7 @@ def Pred (α : fam I) : Sort* := ∀ i, α i → Prop
 def subtype {α : fam I} (p : Pred α) : fam I :=
 λ i, subtype (p i)
 
-def subtype.val {α : fam I} (p : Pred α) : fam.subtype p ⟶ α :=
+def subtype.val {α : fam I} {p : Pred α} : fam.subtype p ⟶ α :=
 λ i, subtype.val
 
 def prod (α β : fam I) : fam I
@@ -50,12 +67,12 @@ namespace pfunctor
 variables {I J : Type u} {F G : fam I ⥤ fam J}
 
 def liftp {α : fam I} (p : fam.Pred α) {X : fam J} : (X ⟶ F.obj α) → Prop :=
-λ x, ∃ u : X ⟶ F.obj (fam.subtype p), u ≫ F.map (fam.subtype.val p) = x
+λ x, ∃ u : X ⟶ F.obj (fam.subtype p), u ≫ F.map fam.subtype.val = x
 
 def liftr {α β : fam I} (r : fam.Pred (α ⊗ β)) {X : fam J} : (X ⟶ F.obj α) → (X ⟶ F.obj β) → Prop :=
 λ x y, ∃ u : X ⟶ F.obj (fam.subtype r),
-  u ≫ F.map (fam.subtype.val _ ≫ fam.prod.fst) = x ∧
-  u ≫ F.map (fam.subtype.val _ ≫ fam.prod.snd) = y
+  u ≫ F.map (fam.subtype.val ≫ fam.prod.fst) = x ∧
+  u ≫ F.map (fam.subtype.val ≫ fam.prod.snd) = y
 
 def supp {α : fam I} {X : fam J} (x : X ⟶ F.obj α) : set (sigma α) := { y : sigma α | ∀ ⦃p⦄, liftp p x → p _ y.2 }
 
@@ -63,6 +80,9 @@ theorem of_mem_supp {α : fam I} {X : fam J} {x : X ⟶ F.obj α} {p : fam.Pred 
   ∀ y ∈ supp x, p _ (sigma.snd y) :=
 λ y hy, hy h
 
+open category_theory
+
+attribute [reassoc] nat_trans.app_naturality nat_trans.naturality
 open category_theory
 
 lemma liftp_comp {α : fam I} {X : fam J} {p : Π i, α i → Prop}
@@ -74,14 +94,15 @@ lemma liftp_comp' {α : fam I} {X : fam J} {p : Π i, α i → Prop}
   (x : X ⟶ F.obj α) (T : F ⟶ G) (T' : G ⟶ F)
   (h_inv : ∀ {α}, T.app α ≫ T'.app α = 𝟙 _):
   liftp p x ↔ liftp p (x ≫ T.app _) :=
--- | ⟨u,h'⟩ :=
 ⟨ liftp_comp x T,
  λ ⟨u,h'⟩, ⟨u ≫ T'.app _,by rw [category.assoc,← nat_trans.naturality,← category.assoc,h',category.assoc,h_inv,category.comp_id]⟩ ⟩
 
 lemma liftr_comp {α : fam I} {X : fam J} (p : fam.Pred (α ⊗ α)) (x y : X ⟶ F.obj α)
    (T : F ⟶ G) :
   liftr p x y → liftr p (x ≫ T.app _) (y ≫ T.app _)
-| ⟨u,h,h'⟩ := ⟨u ≫ T.app _, by { rw ← h'; simp, }⟩
+| ⟨u,h,h'⟩ := ⟨u ≫ T.app _,
+  by { reassoc! h h',
+       rw ← h'; simp only [category.assoc, (nat_trans.naturality _ _).symm,*,eq_self_iff_true, and_self] }⟩
 
 end pfunctor
 
@@ -115,8 +136,13 @@ def map {X Y : fam I} (f : X ⟶ Y) : P.obj X ⟶ P.obj Y := P.apply.map f
 lemma map_id {X : fam I} : P.map (𝟙 X) = 𝟙 _ :=
 category_theory.functor.map_id _ _
 
+
 lemma map_comp {X Y Z : fam I} (f : X ⟶ Y) (g : Y ⟶ Z) : P.map (f ≫ g) = P.map f ≫ P.map g :=
 category_theory.functor.map_comp _ _ _
+
+@[simp, reassoc]
+lemma map_comp_map {X Y Z : fam I} (f : X ⟶ Y) (g : Y ⟶ Z) : P.map f ≫ P.map g = P.map (f ≫ g) :=
+(category_theory.functor.map_comp _ _ _).symm
 
 theorem map_eq {α β : fam I} (f : α ⟶ β) {i : J} (a : P.A i) (g : P.B i a ⟶ α) :
   P.map f ⟨a, g⟩ = ⟨a, g ≫ f⟩ :=
@@ -209,11 +235,34 @@ def comp : pfunctor.{u} I K :=
 -- ⟨ Σ a₂ : P₂.1 _, P₂.2 _ a₂ → P₁.1, ²
   λ k a₂a₁ i, Σ j (u : P₂.2 _ a₂a₁.1 j), P₁.2 _ (a₂a₁.2 u) i ⟩
 
-def comp.mk {α : fam I} {k} (x : P₂.obj (P₁.obj α) k) : (comp P₂ P₁).obj α k :=
-⟨ ⟨x.1,x.2 ≫ λ j, sigma.fst⟩, λ i a₂a₁, (x.2 _).2 a₂a₁.2.2 ⟩
+def comp.mk : Π (α : fam I), P₂.obj (P₁.obj α) ⟶ (comp P₂ P₁).obj α :=
+λ α k x, ⟨ ⟨x.1,x.2 ≫ λ j, sigma.fst⟩, λ i a₂a₁, (x.2 _).2 a₂a₁.2.2 ⟩
 
-def comp.get {α : fam I} {k} (x : (comp P₂ P₁).obj α k) : P₂.obj (P₁.obj α) k :=
-⟨ x.1.1, λ j a₂, ⟨x.1.2 a₂, λ i a₁, x.2 ⟨j, a₂, a₁⟩⟩ ⟩
+def comp.get : Π (α : fam I), (comp P₂ P₁).obj α ⟶ P₂.obj (P₁.obj α) :=
+λ α k x, ⟨ x.1.1, λ j a₂, ⟨x.1.2 a₂, λ i a₁, x.2 ⟨j, a₂, a₁⟩⟩ ⟩
+
+@[simp, reassoc]
+lemma comp.mk_get : Π (α : fam I), comp.mk P₂ P₁ α ≫ comp.get P₂ P₁ α = 𝟙 _ :=
+λ α, funext $ λ k, funext $ λ ⟨x,y⟩, congr_arg (sigma.mk x) (by ext : 3; intros; refl)
+
+@[simp, reassoc]
+lemma comp.get_mk : Π (α : fam I), comp.get P₂ P₁ α ≫ comp.mk P₂ P₁ α = 𝟙 _ :=
+λ α, funext $ λ k, funext $ λ ⟨⟨a,c⟩,b⟩, congr_arg (sigma.mk _) $ by ext _ ⟨a,b,c⟩; refl
+
+instance get.category_theory.is_iso {α : fam I} : category_theory.is_iso (comp.get P₂ P₁ α) :=
+{ inv := comp.mk P₂ P₁ α }
+
+instance mk.category_theory.is_iso {α : fam I} : category_theory.is_iso (comp.mk P₂ P₁ α) :=
+{ inv := comp.get P₂ P₁ α }
+
+@[simp, reassoc]
+lemma comp.map_get : Π {α β : fam I} (f : α ⟶ β), (comp P₂ P₁).map f ≫ comp.get P₂ P₁ β = comp.get P₂ P₁ α ≫ map _ (map _ f) :=
+by { intros, ext _ ⟨a,b⟩; intros; refl }
+
+@[simp, reassoc]
+lemma comp.map_mk : Π {α β : fam I} (f : α ⟶ β), map _ (map _ f) ≫ comp.mk P₂ P₁ β = comp.mk P₂ P₁ α ≫ (comp P₂ P₁).map f :=
+λ α β f,
+@category_theory.mono.right_cancellation _ _ _ _ (comp.get P₂ P₁ β) _ _ _ _ (by simp)
 
 end pfunctor
 
@@ -260,6 +309,20 @@ do h ← get_local n,
    note h.local_pp_name none e',
    clear h
 
+meta def mk_opaque1 (n : parse ident) : tactic unit :=
+do h ← get_local n,
+   n ← revert h,
+   (expr.elet v t d b) ← target,
+   let e := expr.pi v binder_info.default t b,
+   g ← mk_meta_var e,
+   tactic.apply g,
+   gs ← get_goals,
+   set_goals $ g :: gs,
+   intron n
+
+meta def mk_opaque (ns : parse ident*) : tactic unit :=
+ns.mmap' mk_opaque1
+
 meta def apply_symm (n : name) : tactic expr :=
 do e ← mk_const n,
    (vs,t) ← infer_type e >>= mk_local_pis,
@@ -273,14 +336,14 @@ do hs ← ns.mmap $ get_eqn_lemmas_for tt,
    ls.try_apply (λ h, () <$ simp_hyp s u h) (simp_target s u)
    -- simp_target s u
 
-run_cmd add_interactive [``fold,``mk_constructive]
+run_cmd add_interactive [``fold,``mk_constructive,``mk_opaque,``mk_opaque1]
 
 end tactic
 
 @[simp]
 lemma then_def {X Y Z : fam I} (f : X ⟶ Y) (g : Y ⟶ Z) {i} (x : X i) : (f ≫ g) x = g (f x) := rfl
 
-theorem liftp_iff {α : fam I} {X : fam J} (p : Π i, α i → Prop) (x : X ⟶ P.obj α) :
+theorem liftp_iff {α : fam I} {X : fam J} (p : fam.Pred α) (x : X ⟶ P.obj α) :
   liftp p x ↔ ∀ j (y : X j), ∃ a f, x y = ⟨a, f⟩ ∧ ∀ i a, p i (f a) :=
 begin
   split,
@@ -299,24 +362,25 @@ begin
   ext : 2, dsimp, rw F₂, refl
 end
 
-theorem liftr_iff {α : fam I} (r : Π i, α i → α i → Prop) {X : fam J} (x y : X ⟶ P.obj α) :
-  liftr r x y ↔ ∀ j (z : X j), ∃ a f₀ f₁, x z = ⟨a, f₀⟩ ∧ y z = ⟨a, f₁⟩ ∧ ∀ i a, r i (f₀ a) (f₁ a) :=
+theorem liftr_iff {α β : fam I} (r : fam.Pred (α ⊗ β)) {X : fam J} (x : X ⟶ P.obj α) {y} :
+  liftr r x y ↔ ∀ j (z : X j), ∃ a f₀ f₁, x z = ⟨a, f₀⟩ ∧ y z = ⟨a, f₁⟩ ∧ ∀ i a, r i (f₀ a, f₁ a) :=
 begin
   split,
   { rintros ⟨u, xeq, yeq⟩ j z, cases h : u z with a f,
+    -- use a, have := λ i (b : P.B j a i), (f b).val,
     use [a, λ i b, (f b).val.fst, λ i b, (f b).val.snd],
     split, { rw [←xeq, then_def, h], refl },
     split, { rw [←yeq, then_def, h], refl },
-    intros i a, exact (f a).property },
+    intros i a, convert (f a).property, simp [fam.prod.fst,fam.prod.snd,fam.subtype.val] },
   rintros hv, dsimp [liftr],
   mk_constructive hv,
   let F₀ := λ j k, (hv j k).1,
   let F₁ : Π j k, P.B j (F₀ j k) ⟶ α := λ j k, (hv j k).2.1,
-  let F₂ : Π j k, P.B j (F₀ j k) ⟶ α := λ j k, (hv j k).2.2.1,
+  let F₂ : Π j k, P.B j (F₀ j k) ⟶ β := λ j k, (hv j k).2.2.1,
   fold pfunctor.map,
   have F₃ : ∀ j k, x k = ⟨F₀ j k,F₁ j k⟩ := λ j k, (hv j k).2.2.2.1,
   have F₄ : ∀ j k, y k = ⟨F₀ j k,F₂ j k⟩ := λ j k, (hv j k).2.2.2.2.1,
-  have F₅ : ∀ j k i a, r i (F₁ j k a) (F₂ j k a) := λ j k, (hv j k).2.2.2.2.2,
+  have F₅ : ∀ j k i a, r i (F₁ j k a, F₂ j k a) := λ j k, (hv j k).2.2.2.2.2,
   refine ⟨λ j x, ⟨F₀ j x,λ i y, _⟩,_⟩,
   { refine ⟨(F₁ j x y,F₂ j x y),F₅ _ _ _ _⟩ },
   split; ext : 2; [rw F₃,rw F₄]; refl,

@@ -839,3 +839,5 @@ lemma mp_eq_of_heq : Π {α β} {h : α = β} {x : α} {y : β} (h' : x == y), h
 
 -- -- local attribute [user_attribute] local_simp_attr
 -- run_cmd tactic.set_basic_attribute ``user_attribute `local_simp_attr ff
+
+infix ` ⧺ `:65 := (++)

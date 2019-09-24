@@ -54,6 +54,14 @@ lemma split_fun_comp {α β γ : fam (I⊕J)}
   split_fun (f ≫ g) (f' ≫ g') = split_fun f f' ≫ split_fun g g' :=
 by ext (x|x) : 1; ext; refl
 
+lemma split_fun_comp_right {α : fam (I⊕J)} {β γ : fam J} {γ' : fam I}
+  (f : drop α ⟶ γ')
+  (f' : last α ⟶ β) (g' : β ⟶ γ) :
+  (split_fun f (f' ≫ g') : α ⟶ γ'.append1 γ) =
+  (split_fun f f' : α ⟶ γ'.append1 β) ≫ split_fun (𝟙 _) g' :=
+by rw [← split_fun_comp,category.comp_id]
+
+
 def drop_fun {α β : fam (I⊕J)} : Π (f : α ⟶ β), drop α ⟶ drop β
 | f i x := f x
 
