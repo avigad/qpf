@@ -130,4 +130,12 @@ def last : pfunctor I I :=
   P.B i a ⟶ α.append1 β :=
 fam.split_fun f' f
 
+variables {j : I} {a a' : P.A j} {α α' : fam J} {β β' : fam I}
+  (f₀ : P.drop.B j a ⟶ α) (f₁ : α ⟶ α')
+  (g₀ : P.last.B j a ⟶ β) (g₁ : β ⟶ β')
+
+lemma append_contents_comp :
+  append_contents _ (f₀ ≫ f₁) (g₀ ≫ g₁) = append_contents _ f₀ g₀ ≫ fam.split_fun f₁ g₁ :=
+by rw [append_contents,append_contents,← fam.split_fun_comp]
+
 end mvpfunctor

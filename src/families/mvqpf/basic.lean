@@ -29,46 +29,38 @@ Show that every mvqpf is a lawful mvfunctor.
 -/
 include q
 
+attribute [simp, reassoc] abs_map abs_repr
+-- #check abs_repr_assoc
 theorem abs_repr' {α} {i} (x : F.obj α i) : abs F α (repr F α x) = x :=
 show (repr F α ≫ abs F α) x = x, by rw abs_repr; refl
 
 theorem abs_map' {α β : fam I} (f : α ⟶ β) {i} {x : (P F).obj α i} : abs _ _ ((P F).map f x) = F.map f (abs F α x) :=
 show ((P F).map f ≫ abs _ _) x = (abs _ _ ≫ F.map f) x, by rw abs_map
 
-
--- theorem id_map {α : typevec n} (x : F α) : typevec.id <$$> x = x :=
--- by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map], reflexivity }
-
--- theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) (x : F α) :
---   (g ⊚ f) <$$> x = g <$$> f <$$> x :=
--- by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map, ←abs_map, ←abs_map], reflexivity }
-
--- instance is_lawful_mvfunctor : mvfunctor.is_lawful F :=
--- { id_map := @id_map n F _ _,
---   comp_map := @comp_map n F _ _ }
-
--- def mk_B {X : fam J} (P : mvpfunctor I J) (a : X ⟶ P.A) (α : fam I) : Sort* :=
--- Π (i : J) (x : X i), P.B i (a x) ⟶ α
-
--- def mk_obj {α : fam I} {X : fam J} : Π (P : mvpfunctor I J) (a : X ⟶ P.A), mk_B P a α → (X ⟶ P.obj α)
--- | P a f i x := ⟨a x,f _ x⟩
-
--- def P_A (α) : Π (P : mvpfunctor I J), P.obj α ⟶ P.A
--- | P i x := x.1
-
--- def P_B {α} : Π (P : mvpfunctor I J), mk_B P (P_A α P) α
--- | P i ⟨a,f⟩ j b := f b
-
--- include q
--- set_option pp.implicit true
 /- Lifting predicates and relations -/
+
+open category_theory
+
+theorem abs_epi {α β : fam I} {X : fam J} (f g : F.obj α ⟶ X)
+  (h : abs F α ≫ f = abs F α ≫ g) : f = g :=
+suffices 𝟙 _ ≫ f = g, by rw [← this,category.id_comp],
+by rw [← abs_repr,category.assoc,h,← category.assoc,abs_repr,category.id_comp]
+
+theorem repr_mono {α β : fam I} {X : fam J} (f g : X ⟶ F.obj β)
+  (h : f ≫ repr F β = g ≫ repr F β) : f = g :=
+suffices f ≫ 𝟙 _ = g, by rw [← this,category.comp_id],
+by rw [← abs_repr,← category.assoc,h,category.assoc,abs_repr,category.comp_id]
+
+theorem trade  {α : fam I} {X : fam J} (f : (P F).obj α ⟶ X) (g : F.obj α ⟶ X)
+  (h : f = abs F α ≫ g) : repr F α ≫ f = g :=
+by rw [h,← category.assoc,abs_repr,category.id_comp]
 
 theorem liftp_iff {α : fam I} {X : fam J} (p : Π i, α i → Prop) (x : X ⟶ F.obj α) :
   liftp p x ↔ ∀ j (y : X j), ∃ a f, x y = abs F α ⟨a,f⟩ ∧ ∀ i a, p i (f a) :=
 begin
   split,
   { rintros ⟨y, hy⟩ j z, cases h : repr F _ (y z) with a f,
-    use [a,f ≫ fam.subtype.val _], split,
+    use [a,f ≫ fam.subtype.val], split,
     { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy], reflexivity },
     intros i j, apply (f j).property },
   rintros f,
@@ -76,28 +68,42 @@ begin
   let g : X ⟶ (P F).obj (fam.subtype p),
   { intros i y, rcases f i y with ⟨a,g,h,h'⟩,
     refine ⟨a,_⟩, intros k b, refine ⟨g b,h' _ _⟩, },
-  have h : g ≫ (P F).map (fam.subtype.val _) ≫ abs F _ = x,
+  have h : g ≫ (P F).map fam.subtype.val ≫ abs F _ = x,
   { dsimp [g], ext : 2, simp,
-    rcases (f x_1 x_2) with ⟨a,g,h,h'⟩, simp [h],
+    rcases (f x_1 x_2) with ⟨a,g,h,h'⟩, simp [h,map_abs'],
     dsimp [pfunctor.map,pfunctor.apply], refl },
   refine ⟨g ≫ abs F _, _⟩,
   rw [category_theory.category.assoc,← abs_map,h],
 end
 
-theorem liftr_iff {α : typevec n} (r : Π ⦃i⦄, α i → α i → Prop) (x y : F α) :
-  liftr r x y ↔ ∃ a f₀ f₁, x = abs ⟨a, f₀⟩ ∧ y = abs ⟨a, f₁⟩ ∧ ∀ i j, r (f₀ i j) (f₁ i j) :=
+theorem liftr_iff {α β : fam I} {X : fam J} (r : fam.Pred (α ⊗ β))
+  (x : X ⟶ F.obj α) (y : X ⟶ F.obj β) :
+  liftr r x y ↔ ∀ j (k : X j), ∃ a f₀ f₁, x k = abs F _ ⟨a, f₀⟩ ∧ y k = abs F _ ⟨a, f₁⟩ ∧ ∀ i a, r i (f₀ a, f₁ a) :=
 begin
   split,
-  { rintros ⟨u, xeq, yeq⟩, cases h : repr u with a f,
-    use [a, λ i j, (f i j).val.fst, λ i j, (f i j).val.snd],
-    split, { rw [←xeq, ←abs_repr u, h, ←abs_map], refl },
-    split, { rw [←yeq, ←abs_repr u, h, ←abs_map], refl },
-    intros i j, exact (f i j).property },
-  rintros ⟨a, f₀, f₁, xeq, yeq, h⟩,
-  use abs ⟨a, λ i j, ⟨(f₀ i j, f₁ i j), h i j⟩⟩,
-  dsimp, split,
-  { rw [xeq, ←abs_map], refl },
-  rw [yeq, ←abs_map], refl
+  { rintros ⟨y, hy⟩ j z, cases h : repr F _ (y z) with a f,
+    use [a,f ≫ fam.subtype.val ≫ fam.prod.fst,f ≫ fam.subtype.val ≫ fam.prod.snd], split,
+    { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy.1], reflexivity },
+    split,
+    { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy.2], reflexivity },
+    intros i j, convert (f j).property, simp [fam.prod.fst,fam.prod.snd,fam.subtype.val], },
+  rintros f,
+  mk_constructive f,
+  let g : X ⟶ (P F).obj (fam.subtype r),
+  { intros i y, rcases f i y with ⟨a,g,g',h,h',h''⟩,
+    refine ⟨a,_⟩, intros k b, refine ⟨(g b,g' b),h'' _ _⟩, },
+  have h : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.fst) ≫ abs F _ = x,
+  { dsimp [g], ext : 2, simp,
+    rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h],
+    dsimp [pfunctor.map,pfunctor.apply], refl },
+  have h' : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.snd) ≫ abs F _ = y,
+  { dsimp [g], ext : 2, simp,
+    rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h'],
+    dsimp [pfunctor.map,pfunctor.apply], refl },
+  mk_opaque g,
+  refine ⟨g ≫ abs F _, _⟩,
+  simp only [h.symm,h'.symm,pfunctor.map_comp,abs_map,abs_map_assoc,
+    category.assoc,and_self,eq_self_iff_true,category_theory.functor.map_comp],
 end
 
 end mvqpf

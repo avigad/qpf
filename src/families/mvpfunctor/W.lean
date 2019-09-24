@@ -168,6 +168,7 @@ begin
     cases h : f a_2, refl, },
 end
 
+@[elab_as_eliminator]
 theorem W_cases {C : Π i, P.W α i → Prop}
     (ih : ∀ i (a : P.A i) (f' : P.drop.B i a ⟶ α)
               (f : P.last.B i a ⟶ P.W α), C _ (P.W_mk a f' f)) :
@@ -184,11 +185,11 @@ theorem W_mk_eq {i} (a : P.A i) (f : P.last.B i a ⟶ P.last.W)
 
 theorem W_map_W_mk (g : α ⟶ β)
     {i} (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α) :
-  P.Wp.map g (P.W_mk a f' f) = P.W_mk a (f' ≫ g) (f ≫ P.Wp.map g) :=
+  P.W_map g (P.W_mk a f' f) = P.W_mk a (f' ≫ g) (f ≫ P.W_map g) :=
 begin
   have : f ≫ P.Wp.map g = λ _ i, ⟨(f i).fst, ((f i).snd) ≫ g⟩,
   { ext i x : 2, dsimp [function.comp,(≫)], cases (f x), refl },
-  simp [this,W_mk,W_mk_eq,pfunctor.map_eq P.Wp g,comp_W_path_cases_on],
+  simp [W_map,this,W_mk,W_mk_eq,pfunctor.map_eq P.Wp g,comp_W_path_cases_on],
 end
 
 -- TODO: this technical theorem is used in one place in constructing the initial algebra.
@@ -211,8 +212,8 @@ These are needed to use the W-construction to construct a fixed point of a qpf, 
 the qpf axioms are expressed in terms of `map` on `P`.
 -/
 def W_mk' : P.obj (α.append1 (P.W α)) ⟶ P.W α :=
-show Π i, P.obj (α.append1 (P.W α)) i → P.W α i, from
-λ (i : I) ⟨a, f⟩, P.W_mk a (fam.drop_fun f) (fam.last_fun f)
+(λ (i : I) ⟨a, f⟩, P.W_mk a (fam.drop_fun f) (fam.last_fun f) :
+ Π i, P.obj (α.append1 (P.W α)) i → P.W α i)
 
 def W_dest' : P.W α ⟶ P.obj (α.append1 (P.W α)) :=
 show Π i, P.W α i → P.obj (α.append1 (P.W α)) i, from
@@ -225,8 +226,24 @@ theorem W_dest'_W_mk {i}
   P.W_dest' (P.W_mk a f' f) = ⟨a, fam.split_fun f' f⟩ :=
 by simp [W_dest']; erw [W_ind_eq]
 
-theorem W_dest'_W_mk' {i} (x : P.obj (α.append1 (P.W α)) i) :
-  P.W_dest' (P.W_mk' x) = x :=
-by cases x with a f; simp! [W_mk']; rw [W_dest'_W_mk, fam.split_drop_fun_last_fun]
+@[reassoc]
+theorem W_dest'_W_mk' :
+  P.W_mk' ≫ P.W_dest' = 𝟙 (P.obj (α.append1 (P.W α))) :=
+by ext i ⟨a, f⟩ : 2; simp! only [W_mk',(≫),(∘)]; rw [W_dest'_W_mk, fam.split_drop_fun_last_fun]; refl
+
+#check W_mk' .
+
+#check W_ind .
+
+
+theorem W_ind_eq' {X Y : Π i, P.W α i → fam I}
+    (g : Π i (a' : P.A i) (f : (P.drop).B i a' ⟶ α)
+              (f' : (P.last).B i a' ⟶ P.W α),
+              (Π j (a : (P.last).B i a' j),
+                (X j ((f' : Π j, P.last.B i a' j → P.W α j) a) ⟶ Y j (f' a))) →
+             (X i (P.W_mk a' f f') ⟶ Y i (P.W_mk a' f f')))
+    (i) (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α) :
+P.W_mk' ≫ (W_ind P g : (X i (W_mk P a' f f') ⟶ Y i (W_mk P a' f f'))) = _
+
 
 end mvpfunctor
