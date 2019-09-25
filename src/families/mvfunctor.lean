@@ -283,8 +283,8 @@ theorem append_fun_comp_split_fun
 --   (f : α ::: β ⟹ α' ::: β') : drop_fun f ::: last_fun f = f :=
 -- eq_of_drop_last_eq (λ _, rfl) rfl
 
--- theorem append_fun_id_id {α : typevec n} {β : Type*} :
---   @id n α ::: @_root_.id β = id :=
+-- theorem append_fun_id_id {α : fam I} {β : fam J} :
+--   append_fun (𝟙 α) (𝟙 β) = 𝟙 _ :=
 -- eq_of_drop_last_eq (λ _, rfl) rfl
 
 -- instance subsingleton0 : subsingleton (typevec 0) :=
@@ -359,10 +359,10 @@ theorem append_fun_comp_split_fun
 
 -- /- for lifting predicates and relations -/
 
--- /-- `pred_last α p x` predicates `p` of the last element of `x : α.append1 β`. -/
--- def pred_last (α : typevec n) {β : Type*} (p : β → Prop) : Π ⦃i⦄, (α.append1 β) i → Prop
--- | (fin'.raise i) := λ x, true
--- | fin'.last      := p
+/-- `pred_last α p x` predicates `p` of the last element of `x : α.append1 β`. -/
+def pred_last (α : fam I) {β : fam J} (p : Π ⦃i⦄, β i → Prop) : Π ⦃i⦄, (α.append1 β) i → Prop
+| (sum.inl i) x := true
+| (sum.inr j) x := p x
 
 -- /-- `rel_last α r x y` says that `p` the last elements of `x y : α.append1 β` are related by `r` and all the other elements are equal. -/
 -- def rel_last (α : typevec n) {β γ : Type*} (r : β → γ → Prop) :

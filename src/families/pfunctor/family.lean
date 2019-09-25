@@ -54,6 +54,11 @@ lemma split_fun_comp {α β γ : fam (I⊕J)}
   split_fun (f ≫ g) (f' ≫ g') = split_fun f f' ≫ split_fun g g' :=
 by ext (x|x) : 1; ext; refl
 
+lemma append_fun_comp {α β γ : fam I} {α' β' γ' : fam J}
+  (f : α ⟶ β) (f' : α' ⟶ β') (g : β ⟶ γ) (g' : β' ⟶ γ') :
+  append_fun (f ≫ g) (f' ≫ g') = append_fun f f' ≫ append_fun g g' :=
+by erw ← split_fun_comp; refl
+
 lemma split_fun_comp_right {α : fam (I⊕J)} {β γ : fam J} {γ' : fam I}
   (f : drop α ⟶ γ')
   (f' : last α ⟶ β) (g' : β ⟶ γ) :
@@ -69,12 +74,33 @@ def last_fun {α β : fam (I⊕J)} : Π (f : α ⟶ β), last α ⟶ last β
 | f i x := f x
 
 theorem eq_of_drop_last_eq {α β : fam (I⊕J)} {f g : α ⟶ β}
-  (h₀ : ∀ j (x : α (sum.inl j)), drop_fun f x = drop_fun g x) (h₁ : last_fun f = last_fun g) : f = g :=
+  (h₀ : ∀ j (x : α (sum.inl j)), drop_fun f x = drop_fun g x) (h₁ : last_fun f = last_fun g) :
+  f = g :=
 by { ext1 (i|j); ext1 x, apply h₀, apply congr_fun (congr_fun h₁ j), }
 -- by ext1 i; rcases i with ⟨j, ieq⟩ | ieq; [apply h₀, apply h₁]
 
+@[simp]
 theorem split_drop_fun_last_fun {α α' : fam (I⊕J)} (f : α ⟶ α') :
   split_fun (drop_fun f) (last_fun f) = f :=
 eq_of_drop_last_eq (λ _ _, rfl) (funext $ λ _, funext $ λ _, rfl)
+
+theorem append_fun_id_id {α : fam I} {β : fam J} :
+  append_fun (𝟙 α) (𝟙 β) = 𝟙 _ :=
+by apply eq_of_drop_last_eq; intros; try { ext }; refl
+
+def unit (i : I) : fam I
+| j := ulift (plift (i = j))
+
+def unit.star (i : I) : unit i i := ⟨⟨ rfl ⟩⟩
+
+def value (i) (X : fam I) : X i → (unit i ⟶ X)
+| x j ⟨⟨rfl⟩⟩ := x
+
+def value.get {i} {X : fam I} (f : unit i ⟶ X) : X i :=
+f ⟨⟨rfl⟩⟩
+
+@[simp]
+lemma value_eq  (i) (X : fam I) (x : X i) : Π {u : unit i i}, value i X x u = x
+| ⟨⟨rfl⟩⟩ := rfl
 
 end fam

@@ -141,7 +141,8 @@ end
 
 def W_ind {C : Π i, P.W α i → Sort*}
     (ih : ∀ i (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α),
-      (∀ j x, C j $ (f : Π j, P.last.B i a j → P.W α j) x) → C i (P.W_mk a f' f)) :
+            (∀ j x, C j $ (f : Π j, P.last.B i a j → P.W α j) x) →
+            C i (P.W_mk a f' f)) :
   ∀ i x, C i x
 | i ⟨a,f⟩ :=
 @mvpfunctor.Wp_ind _ _ P α (λ i a f, C _ ⟨a, f⟩) (λ i a f f',
@@ -231,19 +232,18 @@ theorem W_dest'_W_mk' :
   P.W_mk' ≫ P.W_dest' = 𝟙 (P.obj (α.append1 (P.W α))) :=
 by ext i ⟨a, f⟩ : 2; simp! only [W_mk',(≫),(∘)]; rw [W_dest'_W_mk, fam.split_drop_fun_last_fun]; refl
 
-#check W_mk' .
+theorem W_dest'_W_mk'' {i}
+    (a : P.obj (α.append1 (P.W α)) i)  :
+  P.W_dest' (P.W_mk' a) = a :=
+by rcases a with ⟨a,f⟩; simp [W_mk', W_dest'_W_mk]
 
-#check W_ind .
-
-
-theorem W_ind_eq' {X Y : Π i, P.W α i → fam I}
-    (g : Π i (a' : P.A i) (f : (P.drop).B i a' ⟶ α)
-              (f' : (P.last).B i a' ⟶ P.W α),
-              (Π j (a : (P.last).B i a' j),
-                (X j ((f' : Π j, P.last.B i a' j → P.W α j) a) ⟶ Y j (f' a))) →
-             (X i (P.W_mk a' f f') ⟶ Y i (P.W_mk a' f f')))
-    (i) (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α) :
-P.W_mk' ≫ (W_ind P g : (X i (W_mk P a' f f') ⟶ Y i (W_mk P a' f f'))) = _
-
+-- theorem W_ind_eq' {X Y : Π i, P.W α i → fam I}
+--     (g : Π i (a' : P.A i) (f : (P.drop).B i a' ⟶ α)
+--               (f' : (P.last).B i a' ⟶ P.W α),
+--               (Π j (a : (P.last).B i a' j),
+--                 (X j ((f' : Π j, P.last.B i a' j → P.W α j) a) ⟶ Y j (f' a))) →
+--              (X i (P.W_mk a' f f') ⟶ Y i (P.W_mk a' f f')))
+--     (i) (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α) :
+-- P.W_mk' ≫ (W_ind P g : (X i (W_mk P a' f f') ⟶ Y i (W_mk P a' f f'))) = _
 
 end mvpfunctor

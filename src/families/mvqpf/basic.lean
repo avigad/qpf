@@ -19,18 +19,13 @@ namespace mvqpf
 variables {I J : Type u} {F : fam I ⥤ fam J} [q : mvqpf F]
 open pfunctor (liftp liftr)
 
--- def repr {α : typevec n} (x : F α) := repr' n x
-
--- theorem abs_repr {α : fam I} (x : F α) : abs (repr x) = x :=
--- abs_repr' n x
-
 /-
 Show that every mvqpf is a lawful mvfunctor.
 -/
 include q
 
 attribute [simp, reassoc] abs_map abs_repr
--- #check abs_repr_assoc
+
 theorem abs_repr' {α} {i} (x : F.obj α i) : abs F α (repr F α x) = x :=
 show (repr F α ≫ abs F α) x = x, by rw abs_repr; refl
 
@@ -55,6 +50,10 @@ theorem trade  {α : fam I} {X : fam J} (f : (P F).obj α ⟶ X) (g : F.obj α �
   (h : f = abs F α ≫ g) : repr F α ≫ f = g :=
 by rw [h,← category.assoc,abs_repr,category.id_comp]
 
+open pfunctor (map_eq)
+
+open mvqpf (abs_map)
+
 theorem liftp_iff {α : fam I} {X : fam J} (p : Π i, α i → Prop) (x : X ⟶ F.obj α) :
   liftp p x ↔ ∀ j (y : X j), ∃ a f, x y = abs F α ⟨a,f⟩ ∧ ∀ i a, p i (f a) :=
 begin
@@ -70,8 +69,8 @@ begin
     refine ⟨a,_⟩, intros k b, refine ⟨g b,h' _ _⟩, },
   have h : g ≫ (P F).map fam.subtype.val ≫ abs F _ = x,
   { dsimp [g], ext : 2, simp,
-    rcases (f x_1 x_2) with ⟨a,g,h,h'⟩, simp [h,map_abs'],
-    dsimp [pfunctor.map,pfunctor.apply], refl },
+    rcases (f x_1 x_2) with ⟨a,g,h,h'⟩, simp [h],
+    erw [← abs_map',map_eq], refl },
   refine ⟨g ≫ abs F _, _⟩,
   rw [category_theory.category.assoc,← abs_map,h],
 end
@@ -93,13 +92,13 @@ begin
   { intros i y, rcases f i y with ⟨a,g,g',h,h',h''⟩,
     refine ⟨a,_⟩, intros k b, refine ⟨(g b,g' b),h'' _ _⟩, },
   have h : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.fst) ≫ abs F _ = x,
-  { dsimp [g], ext : 2, simp,
+  { dsimp [g], ext : 2, simp, mk_opaque g,
     rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h],
-    dsimp [pfunctor.map,pfunctor.apply], refl },
+    erw [← abs_map',← abs_map',map_eq], refl },
   have h' : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.snd) ≫ abs F _ = y,
   { dsimp [g], ext : 2, simp,
     rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h'],
-    dsimp [pfunctor.map,pfunctor.apply], refl },
+    erw [← abs_map',← abs_map',map_eq], refl },
   mk_opaque g,
   refine ⟨g ≫ abs F _, _⟩,
   simp only [h.symm,h'.symm,pfunctor.map_comp,abs_map,abs_map_assoc,
