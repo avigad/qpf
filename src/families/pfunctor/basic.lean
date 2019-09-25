@@ -312,10 +312,10 @@ do h ← get_local n,
 meta def mk_opaque1 (n : parse ident) : tactic unit :=
 do h ← get_local n,
    n ← revert h,
-   (expr.elet v t d b) ← target,
+   (expr.elet v t d b) ← target | fail "not a let expression",
    let e := expr.pi v binder_info.default t b,
    g ← mk_meta_var e,
-   tactic.apply g,
+   tactic.exact $ g d,
    gs ← get_goals,
    set_goals $ g :: gs,
    intron n
