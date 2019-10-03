@@ -738,17 +738,17 @@ do let n := func.live_params.length,
 open interactive lean.parser lean
 
 @[user_command]
-meta def qpf_decl (meta_info : decl_meta_info) (_ : parse (tk "qpf")) : parser unit :=
+meta def qpf_decl (meta_info : decl_meta_info) (_ : parse (tk "qpf")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
    func ← mk_internal_functor' d,
-   trace_error $ mk_mvfunctor_instance func,
+   trace_error "mk_mvfunctor_instance" $ mk_mvfunctor_instance func,
    mk_pfunctor func,
-   trace_error $ mk_pfunc_constr func,
-   trace_error $ mk_pfunc_recursor func,
+   trace_error "mk_pfunc_constr" $ mk_pfunc_constr func,
+   trace_error "mk_pfunc_recursor" $ mk_pfunc_recursor func,
    -- trace_error $ mk_pfunc_rec_eqns func,
    -- mk_pfunc_map func,
    -- mk_pfunc_mvfunctor_instance func,
-   trace_error $ mk_mvqpf_instance func,
+   trace_error "mk_mvqpf_instance" $ mk_mvqpf_instance func,
    pure ()
 
 -- local attribute [user_command]  qpf_decl

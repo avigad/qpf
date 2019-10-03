@@ -60,7 +60,7 @@ do let dead := func.dead_params.map prod.fst,
    add_decl $ mk_definition func.decl.to_name.get_prefix func.induct.u_names t df,
    pure ()
 
-meta def mk_datatype (iter : name) (d : inductive_decl) : parser (datatype_shape × internal_mvfunctor) :=
+meta def mk_datatype (iter : name) (d : inductive_decl) : lean.parser (datatype_shape × internal_mvfunctor) :=
 do (func', d) ← mk_shape_functor' d,
    let func : internal_mvfunctor := { .. func' },
    mk_mvfunctor_instance func,

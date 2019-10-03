@@ -236,13 +236,6 @@ meta def pred : level → level
 
 end level
 
-namespace declaration
-
-meta def univ_levels (d : declaration) : list level :=
-d.univ_params.map level.param
-
-end declaration
-
 namespace native
 namespace rb_map
 
@@ -334,13 +327,6 @@ meta def trace_def (n : name) : tactic unit :=
 do (defn n _ t df _ _) ← get_decl n,
    t ← pp t, df ← pp df,
    trace format!"\ndef {n} : {t} :=\n{df}\n"
-
-meta def trace_error {α} (tac : tactic α) : tactic α :=
-λ s, match tac s with
-     | r@(result.success _ _) := r
-     | (result.exception (some msg) pos s') := (trace (msg ()) >> result.exception (some msg) pos) s'
-     | (result.exception none pos s') := (trace "no msg" >> result.exception none pos) s'
-     end
 
 meta def is_type (e : expr) : tactic bool :=
 do (expr.sort _) ← infer_type e | pure ff,
@@ -610,12 +596,6 @@ namespace tactic.interactive
 open lean lean.parser interactive interactive.types tactic
 
 local postfix `*`:9000 := many
-
-meta def clear_except (xs : parse ident *) : tactic unit :=
-do let ns := name_set.of_list xs,
-   local_context >>= mmap' (λ h : expr,
-     when (¬ ns.contains h.local_pp_name) $
-       try $ tactic.clear h) ∘ list.reverse
 
 meta def splita := split; [skip, assumption]
 

@@ -184,25 +184,25 @@ do let params := func.dead_params.map prod.fst,
    set_basic_attribute `instance (func.induct.name <.> "mvqpf")
 
 @[user_command]
-meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
+meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.fix d,
-   trace_error $ mk_constr ``mvqpf.fix.mk d,
-   trace_error $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
-   trace_error $ mk_recursor func d,
-   trace_error $ mk_dep_recursor func d,
-   trace_error $ mk_fix_functor_instance d,
+   trace_error "mk_constr" $ mk_constr ``mvqpf.fix.mk d,
+   trace_error "mk_destr" $ mk_destr ``mvqpf.fix.dest ``mvqpf.fix.mk ``mvqpf.fix.mk_dest func d,
+   trace_error "mk_recursor" $ mk_recursor func d,
+   trace_error "mk_dep_recursor" $ mk_dep_recursor func d,
+   trace_error "mk_fix_functor_instance" $ mk_fix_functor_instance d,
    pure ()
 
 @[user_command]
-meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
+meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
    (func,d) ← mk_datatype ``mvqpf.cofix d,
-   trace_error $ mk_constr ``mvqpf.cofix.mk d,
-   trace_error $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
-   trace_error $ mk_corecursor func d,
-   trace_error $ mk_cofix_functor_instance d,
-   trace_error $ mk_bisim func d,
+   trace_error "mk_constr" $ mk_constr ``mvqpf.cofix.mk d,
+   trace_error "mk_destr" $ mk_destr ``mvqpf.cofix.dest ``mvqpf.cofix.mk ``mvqpf.cofix.mk_dest func d,
+   trace_error "mk_corecursor" $ mk_corecursor func d,
+   trace_error "mk_cofix_functor_instance" $ mk_cofix_functor_instance d,
+   trace_error "mk_bisim" $ mk_bisim func d,
    pure ()
 
 end tactic
