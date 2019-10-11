@@ -26,13 +26,12 @@ theorem recF_eq (g : F.obj (α.append1 β) ⟶ β)
 by simp [recF]; rw [mvpfunctor.W_ind_eq]; refl
 
 theorem recF_eq' (g : F.obj (α.append1 β) ⟶ β) :
-  -- recF g x = g (abs F _ ((P F).map (fam.append_fun (𝟙 _) (recF g)) (q.P.W_dest' x))) :=
   recF g = q.P.W_dest' ≫ q.P.map (fam.append_fun (𝟙 _) (recF g)) ≫ abs F _ ≫ g :=
 begin
   ext i x : 2,
   apply q.P.W_cases _ _ x,
   intros j a f' f, erw [recF_eq], apply congr_arg (@g _),
-  erw [pfunctor.map_eq,mvfunctor.append_fun_comp_split_fun], congr,
+  erw [pfunctor.map_eq',mvfunctor.append_fun_comp_split_fun], congr,
   ext : 2, dsimp, rw mvpfunctor.W_path_dest_right_W_path_cases_on, cases f x_2; refl,
 end
 
@@ -113,7 +112,7 @@ begin
   apply q.P.W_ind _ _ x, intros i a f' f ih,
   apply Wequiv.trans _ (q.P.W_mk a f' (f ≫ Wrepr)),
   { apply Wequiv.abs',
-    rw [Wrepr_W_mk, q.P.W_dest'_W_mk, q.P.W_dest'_W_mk'', abs_repr', pfunctor.map_eq],
+    rw [Wrepr_W_mk, q.P.W_dest'_W_mk, q.P.W_dest'_W_mk'', abs_repr', pfunctor.map_eq'],
     congr, erw [← split_fun_comp,category.comp_id], },
   apply Wequiv.ind, exact ih
 end
@@ -126,7 +125,7 @@ begin
     { erw [q.P.W_map_W_mk, q.P.W_map_W_mk], apply Wequiv.ind, apply ih },
   case mvqpf.Wequiv.abs : j a₀ f'₀ f₀ a₁ f'₁ f₁ h ih
     { rw [q.P.W_map_W_mk, q.P.W_map_W_mk], apply Wequiv.abs,
-      rw [mvpfunctor.append_contents_comp, mvpfunctor.append_contents_comp, ← pfunctor.map_eq, ← pfunctor.map_eq, abs_map', abs_map', h]},
+      rw [mvpfunctor.append_contents_comp, mvpfunctor.append_contents_comp, ← pfunctor.map_eq', ← pfunctor.map_eq', abs_map', abs_map', h]},
   case mvqpf.Wequiv.trans : i x y z e₁ e₂ ih₁ ih₂
     { apply mvqpf.Wequiv.trans, apply ih₁, apply ih₂ }
 end
@@ -229,8 +228,8 @@ theorem fix.ind_aux {i} (a : q.P.A i) (f' : q.P.drop.B _ a ⟶ α) (f : q.P.last
 have fix.mk (abs F _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦Wrepr (q.P.W_mk a f' f)⟧,
   begin
     apply quot.sound, apply Wequiv.abs',
-    rw [mvpfunctor.W_dest'_W_mk'', abs_map', abs_repr', ←abs_map', pfunctor.map_eq],
-    conv { to_rhs, rw [Wrepr_W_mk, q.P.W_dest'_W_mk'', abs_repr', pfunctor.map_eq] },
+    rw [mvpfunctor.W_dest'_W_mk'', abs_map', abs_repr', ←abs_map', pfunctor.map_eq'],
+    conv { to_rhs, rw [Wrepr_W_mk, q.P.W_dest'_W_mk'', abs_repr', pfunctor.map_eq'] },
     congr' 2, rw [mvpfunctor.append_contents, mvpfunctor.append_contents],
     rw [append_fun, append_fun, ←split_fun_comp, ←split_fun_comp],
     reflexivity
@@ -238,7 +237,7 @@ have fix.mk (abs F _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦W
 by { rw this, apply quot.sound, apply Wrepr_equiv }
 
 theorem fix.ind_rec {β : fam J} (g₁ g₂ : fix F α ⟶ β)
-    (h : ∀ ⦃X⦄ x : X ⟶ F.obj (append1 α (fix F α)),
+    (h : ∀ ⦃i⦄ x : unit i ⟶ F.obj (append1 α (fix F α)),
       x ≫ F.map (append_fun (𝟙 _) g₁) = x ≫ F.map (append_fun (𝟙 α) g₂) →
       x ≫ fix.mk ≫ g₁ = x ≫ fix.mk ≫ g₂) :
   g₁ = g₂ :=
@@ -254,9 +253,9 @@ begin
   -- { replace h := congr_fun (congr_fun h _) (abs F _ ⟨a,mvpfunctor.append_contents _ f' (λ i x, ⟦f x⟧)⟩),
   --   simp at h, exact h },
   -- { ext, cases x_2, },
-  { replace h := congr_fun (congr_fun h j) ⟨⟨rfl⟩⟩, simp [value] at h, exact h },
+  { replace h := congr_fun (congr_fun h j) unit.rfl, simp [value] at h, exact h },
   ext _ ⟨⟨⟨ rfl ⟩⟩⟩, simp [value,mvpfunctor.append_contents,append_fun],
-  rw [← abs_map',← abs_map',pfunctor.map_eq,pfunctor.map_eq,← split_fun_comp,← split_fun_comp],
+  rw [← abs_map',← abs_map',pfunctor.map_eq',pfunctor.map_eq',← split_fun_comp,← split_fun_comp],
   congr' 3, ext, apply ih,
 end
 
@@ -298,7 +297,7 @@ begin
   apply h i (value _ _ (abs F (append1 α (fix F α))
           ⟨a,
            mvpfunctor.append_contents (P F) f' (λ (i_1 : J) (x : (mvpfunctor.last (P F)).B i a i_1), ⟦f x⟧)⟩))
-          _ ⟨⟨rfl⟩⟩,
+          _ unit.rfl,
   rw [mvqpf.liftp_iff],
   rintros k ⟨⟨rfl⟩⟩,
   refine ⟨a, _, rfl, _⟩,

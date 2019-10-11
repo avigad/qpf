@@ -50,7 +50,7 @@ theorem trade  {α : fam I} {X : fam J} (f : (P F).obj α ⟶ X) (g : F.obj α �
   (h : f = abs F α ≫ g) : repr F α ≫ f = g :=
 by rw [h,← category.assoc,abs_repr,category.id_comp]
 
-open pfunctor (map_eq)
+open pfunctor (map_eq')
 
 open mvqpf (abs_map)
 
@@ -60,7 +60,7 @@ begin
   split,
   { rintros ⟨y, hy⟩ j z, cases h : repr F _ (y z) with a f,
     use [a,f ≫ fam.subtype.val], split,
-    { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy], reflexivity },
+    { rw [← pfunctor.map_eq', ← h, abs_map', abs_repr', ← hy], reflexivity },
     intros i j, apply (f j).property },
   rintros f,
   mk_constructive f,
@@ -70,7 +70,7 @@ begin
   have h : g ≫ (P F).map fam.subtype.val ≫ abs F _ = x,
   { dsimp [g], ext : 2, simp,
     rcases (f x_1 x_2) with ⟨a,g,h,h'⟩, simp [h],
-    erw [← abs_map',map_eq], refl },
+    erw [← abs_map',map_eq'], refl },
   refine ⟨g ≫ abs F _, _⟩,
   rw [category_theory.category.assoc,← abs_map,h],
 end
@@ -82,9 +82,9 @@ begin
   split,
   { rintros ⟨y, hy⟩ j z, cases h : repr F _ (y z) with a f,
     use [a,f ≫ fam.subtype.val ≫ fam.prod.fst,f ≫ fam.subtype.val ≫ fam.prod.snd], split,
-    { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy.1], reflexivity },
+    { rw [← pfunctor.map_eq', ← h, abs_map', abs_repr', ← hy.1], reflexivity },
     split,
-    { rw [← pfunctor.map_eq, ← h, abs_map', abs_repr', ← hy.2], reflexivity },
+    { rw [← pfunctor.map_eq', ← h, abs_map', abs_repr', ← hy.2], reflexivity },
     intros i j, convert (f j).property, simp [fam.prod.fst,fam.prod.snd,fam.subtype.val], },
   rintros f,
   mk_constructive f,
@@ -94,15 +94,29 @@ begin
   have h : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.fst) ≫ abs F _ = x,
   { dsimp [g], ext : 2, simp, mk_opaque g,
     rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h],
-    erw [← abs_map',← abs_map',map_eq], refl },
+    erw [← abs_map',← abs_map',map_eq'], refl },
   have h' : g ≫ (P F).map (fam.subtype.val ≫ fam.prod.snd) ≫ abs F _ = y,
   { dsimp [g], ext : 2, simp,
     rcases (f x_1 x_2) with ⟨a,g,g',h,h',h''⟩, simp [h'],
-    erw [← abs_map',← abs_map',map_eq], refl },
+    erw [← abs_map',← abs_map',map_eq'], refl },
   mk_opaque g,
   refine ⟨g ≫ abs F _, _⟩,
   simp only [h.symm,h'.symm,pfunctor.map_comp,abs_map,abs_map_assoc,
     category.assoc,and_self,eq_self_iff_true,category_theory.functor.map_comp],
+end
+open fam
+
+theorem liftr_iff' {α β : fam I} (r : fam.Pred (α ⊗ β))
+  {i : J} (x : unit i ⟶ F.obj α) (y : unit i ⟶ F.obj β) :
+  liftr r x y ↔ ∃ a f₀ f₁, x = value i (q.P.obj _) ⟨a, f₀⟩ ≫ abs F _ ∧ y = value i (q.P.obj _) ⟨a, f₁⟩ ≫ abs F _ ∧ ∀ i a, r i (f₀ a, f₁ a) :=
+begin
+  rw liftr_iff, split,
+  { intros h, rcases h _ unit.rfl with ⟨a,f₀,f₁,hx,hy,hf₀₁⟩, clear h,
+    refine ⟨a,f₀,f₁,_,_,hf₀₁⟩; ext _ ⟨ ⟩,
+    rw hx, refl, rw hy, refl },
+  { rintro ⟨a,f₀,f₁,hx,hy,hf₀₁⟩ _ ⟨ ⟩,
+    refine ⟨a,f₀,f₁,_,_,hf₀₁⟩,
+    rw hx, refl, rw hy, refl }
 end
 
 end mvqpf

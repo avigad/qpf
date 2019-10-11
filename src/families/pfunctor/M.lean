@@ -744,18 +744,18 @@ lemma M_dest_corec' (g : α ⟶ P.obj α) :
   M_corec g ≫ M_dest = g ≫ P.map (M_corec g) :=
 funext $ λ i, funext $ λ x, M_dest_corec _ _
 section tactic
-#check @environment.decl_filter_map
+-- #check @environment.decl_filter_map
 open tactic expr
-run_cmd do
-  d ← get_decl ``tactic.coinduction,
-  env ← get_env,
-  some fn ← pure (env.decl_olean d.to_name),
-  let xs := env.decl_filter_map (λ d,
-    do n ← env.decl_olean d.to_name,
-       guard (n = fn ∧ d.to_name.update_prefix name.anonymous = `compact_relation),
-       pure d.to_name),
-  trace $ xs.take 10,
-  skip
+-- run_cmd do
+--   d ← get_decl ``tactic.coinduction,
+--   env ← get_env,
+--   some fn ← pure (env.decl_olean d.to_name),
+--   let xs := env.decl_filter_map (λ d,
+--     do n ← env.decl_olean d.to_name,
+--        guard (n = fn ∧ d.to_name.update_prefix name.anonymous = `compact_relation),
+--        pure d.to_name),
+--   trace $ xs.take 10,
+--   skip
 
 meta def find_private_decl (n : name) (fr : option name) : tactic name :=
 do env ← get_env,
@@ -939,9 +939,9 @@ begin
   intros i x _,
   cases gxeq : g x with a f',
   have h₀ : M_dest (f x) = ⟨a, f' ≫ f⟩,
-  { rw [hyp, gxeq, pfunctor.map_eq] },
+  { rw [hyp, gxeq, pfunctor.map_eq'] },
   have h₁ : M_dest (M_corec g x) = ⟨a, f' ≫ M_corec g⟩,
-  { rw [M_dest_corec, gxeq, pfunctor.map_eq], },
+  { rw [M_dest_corec, gxeq, pfunctor.map_eq'], },
   refine ⟨_, _, _, h₀, h₁, _⟩,
   intros i y,
   exact ⟨f' y, trivial, rfl, rfl⟩
@@ -956,7 +956,7 @@ begin
   intros j x _,
   cases Mxeq : M_dest x with a f',
   have : M_dest (M_mk (M_dest x)) = ⟨a, _⟩,
-  { rw [M_mk, M_dest_corec, Mxeq, pfunctor.map_eq, pfunctor.map_eq] },
+  { rw [M_mk, M_dest_corec, Mxeq, pfunctor.map_eq', pfunctor.map_eq'] },
   refine ⟨_, _, _, this, rfl, _⟩,
   intros i y,
   exact ⟨f' y, trivial, rfl, rfl⟩
