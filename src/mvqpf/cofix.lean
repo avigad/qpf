@@ -36,7 +36,7 @@ quot (@Mcongr _ F _ q α)
 def cofix.map {α β : typevec n} (g : α ⟹ β) : cofix F α → cofix F β :=
 quot.lift (λ x : q.P.M α, quot.mk Mcongr (g <$$> x))
   begin
-    rintros a₁ a₂ ⟨r, pr, ra₁a₂⟩, apply quot.sound,
+    rintros aa₁ aa₂ ⟨r, pr, ra₁a₂⟩, apply quot.sound,
     let r' := λ b₁ b₂, ∃ a₁ a₂ : q.P.M α, r a₁ a₂ ∧ b₁ = g <$$> a₁ ∧ b₂ = g <$$> a₂,
     use r', split,
     { show is_precongr r',
@@ -48,7 +48,7 @@ quot.lift (λ x : q.P.M α, quot.mk Mcongr (g <$$> x))
       rw [b₁eq, b₂eq, q.P.M_dest_map, q.P.M_dest_map, ←q.P.comp_map, ←q.P.comp_map],
       rw [←append_fun_comp, id_comp, hu, hu, ←comp_id g, append_fun_comp],
       rw [q.P.comp_map, q.P.comp_map, abs_map, pr ra₁a₂, ←abs_map] },
-    show r' (g <$$> a₁) (g <$$> a₂), from ⟨a₁, a₂, ra₁a₂, rfl, rfl⟩
+    show r' (g <$$> aa₁) (g <$$> aa₂), from ⟨aa₁, aa₂, ra₁a₂, rfl, rfl⟩
   end
 
 instance cofix.mvfunctor : mvfunctor (cofix F) :=

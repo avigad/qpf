@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Simon Hudon
 -/
 import data.pfun category.functor category.applicative data.list.sort data.list.basic
-
+import system.io
 universes u v
 
 lemma eq_mp_heq :
@@ -841,3 +841,75 @@ lemma mp_eq_of_heq : Π {α β} {h : α = β} {x : α} {y : β} (h' : x == y), h
 -- run_cmd tactic.set_basic_attribute ``user_attribute `local_simp_attr ff
 
 infix ` ⧺ `:65 := (++)
+
+noncomputable def classical.indefinite_description' {α : Sort*} (p : α → Prop) (h : ∃ (x : α), p x) : psigma p :=
+let ⟨x,h'⟩ := classical.indefinite_description p h in ⟨x,h'⟩
+
+namespace tactic
+
+open tactic .
+
+meta def mk_constructive_aux : expr → expr → tactic expr
+| e `(∃ x : %%t, %%b) :=
+  do let l := expr.lam `x binder_info.default t b,
+     e ← mk_mapp ``classical.indefinite_description' [t,l,e],
+     t ← infer_type e,
+     mk_constructive_aux e t <|> pure e
+| e `(@psigma %%α %%f) :=
+  do id_f ← mk_mapp ``id [α],
+     v ← mk_local_def `v α,
+     f' ← head_beta $ f v,
+     v' ← mk_local_def `v' f',
+     fn ← mk_constructive_aux v' f',
+     t ← infer_type fn >>= lambdas [v],
+     fn ← lambdas [v,v'] fn,
+     r ← mk_mapp ``psigma.map [α,α,f,t,id_f],
+     pure $ r fn e
+| e t := fail!"no match {t}"
+
+setup_tactic_parser
+
+meta def mk_constructive (n : parse ident) : tactic unit :=
+do h ← get_local n,
+   (vs,t) ← infer_type h >>= instantiate_mvars >>= mk_local_pis,
+   e' ← mk_constructive_aux (h.mk_app vs) t,
+   -- let e' := e.mk_app vs,
+   e' ← lambdas vs e',
+   note h.local_pp_name none e',
+   clear h
+
+meta def mk_opaque1 (n : parse ident) : tactic unit :=
+do h ← get_local n,
+   n ← revert h,
+   (expr.elet v t d b) ← target | fail "not a let expression",
+   let e := expr.pi v binder_info.default t b,
+   g ← mk_meta_var e,
+   tactic.exact $ g d,
+   gs ← get_goals,
+   set_goals $ g :: gs,
+   intron n
+
+meta def mk_opaque (ns : parse ident*) : tactic unit :=
+ns.mmap' mk_opaque1
+
+meta def apply_symm (n : name) : tactic expr :=
+do e ← mk_const n,
+   (vs,t) ← infer_type e >>= mk_local_pis,
+   e' ← mk_eq_symm $ e.mk_app vs,
+   lambdas vs e'
+
+meta def fold (ns : parse ident*) (ls : parse location) : tactic unit :=
+do hs ← ns.mmap $ get_eqn_lemmas_for tt,
+   hs ← hs.join.mmap apply_symm,
+   (s,u) ← mk_simp_set tt [] (hs.map $ simp_arg_type.expr ∘ to_pexpr),
+   ls.try_apply (λ h, () <$ simp_hyp s u h) (simp_target s u)
+   -- simp_target s u
+
+run_cmd add_interactive [``fold,``mk_constructive,``mk_opaque,``mk_opaque1]
+
+end tactic
+
+-- example {α} (p : α → α → Prop) (h : ∀ x, ∃ y, p x y) : false :=
+-- begin
+--   mk_constructive h,
+-- end

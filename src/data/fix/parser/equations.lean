@@ -363,9 +363,9 @@ do let params := func.dead_params.map prod.fst,
    set_basic_attribute `instance (func.induct.name <.> "mvqpf")
 
 @[user_command]
-meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : parser unit :=
+meta def data_decl (meta_info : decl_meta_info) (_ : parse (tk "data")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
-   trace_error $ do
+   trace_error "foo" $ do
      (func,d) ← mk_datatype ``mvqpf.fix d,
      mk_liftp_eqns func.to_internal_mvfunctor,
      mk_constr ``mvqpf.fix.mk d,
@@ -382,9 +382,9 @@ do d ← inductive_decl.parse meta_info,
 #check @timetac
 
 @[user_command]
-meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : parser unit :=
+meta def codata_decl (meta_info : decl_meta_info) (_ : parse (tk "codata")) : lean.parser unit :=
 do d ← inductive_decl.parse meta_info,
-   trace_error $ do
+   trace_error "bar" $ do
      (func,d) ← mk_datatype ``mvqpf.cofix d,
      mk_liftp_eqns func.to_internal_mvfunctor,
      mk_constr ``mvqpf.cofix.mk d,
@@ -408,12 +408,12 @@ codata part (α : Type)
 | pure : α → part
 | delay : part → part
 
-#check part.corec
-def diverge {α} : part α :=
-part.corec _ unit (λ _, part.shape.delay _ ()) ()
-#check part.bisim
-example {α} : @diverge α = part.delay _ diverge :=
-begin
-  -- apply part.bisim _ (λ _ _, true),
-  conv { to_lhs, rw diverge, }
-end
+-- #check part.corec
+-- def diverge {α} : part α :=
+-- part.corec _ unit (λ _, part.shape.delay _ ()) ()
+-- #check part.bisim
+-- example {α} : @diverge α = part.delay _ diverge :=
+-- begin
+--   -- apply part.bisim _ (λ _ _, true),
+--   conv { to_lhs, rw diverge, }
+-- end

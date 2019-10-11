@@ -204,9 +204,11 @@ variables {I J : Type u} {α β γ : fam I} {F : fam I ⥤ fam J}
 --   (h₀ : ∀ j, drop_fun f j = drop_fun g j) (h₁ : last_fun f = last_fun g) : f = g :=
 -- by ext1 i; rcases i with ⟨j, ieq⟩ | ieq; [apply h₀, apply h₁]
 
--- @[simp] theorem drop_fun_split_fun {α α' : typevec (n+1)}
---   (f : drop α ⟹ drop α') (g : last α → last α') :
---   drop_fun (split_fun f g) = f := rfl
+open fam
+
+@[simp] theorem drop_fun_split_fun {α α' : fam (I ⊕ J)}
+  (f : drop α ⟶ drop α') (g : last α ⟶ last α') :
+  drop_fun (split_fun f g) = f := by ext; refl
 
 -- def arrow.mp {α β : typevec n} (h : α = β) : α ⟹ β
 -- | i := eq.mp (congr_fun h _)
@@ -217,9 +219,9 @@ variables {I J : Type u} {α β γ : fam I} {F : fam I ⥤ fam J}
 -- def to_append1_drop_last {α : typevec (n+1)} : α ⟹ drop α ::: last α :=
 -- arrow.mpr (append1_drop_last _)
 
--- @[simp] theorem last_fun_split_fun {α α' : typevec (n+1)}
---   (f : drop α ⟹ drop α') (g : last α → last α') :
---   last_fun (split_fun f g) = g := rfl
+@[simp] theorem last_fun_split_fun {α α' : fam (I⊕J)}
+  (f : drop α ⟶ fam.drop α') (g : last α ⟶ last α') :
+  last_fun (split_fun f g) = g := by ext; refl
 
 -- @[simp] theorem drop_fun_append_fun {α α' : typevec n} {β β' : Type*} (f : α ⟹ α') (g : β → β') :
 --   drop_fun (f ::: g) = f := rfl
@@ -230,11 +232,12 @@ variables {I J : Type u} {α β γ : fam I} {F : fam I ⥤ fam J}
 -- theorem split_drop_fun_last_fun {α α' : typevec (n+1)} (f : α ⟹ α') :
 --   split_fun (drop_fun f) (last_fun f) = f :=
 -- eq_of_drop_last_eq (λ _, rfl) rfl
+open fam
 
--- theorem split_fun_inj
---   {α α' : typevec (n+1)} {f f' : drop α ⟹ drop α'} {g g' : last α → last α'}
---   (H : split_fun f g = split_fun f' g') : f = f' ∧ g = g' :=
--- by rw [← drop_fun_split_fun f g, H, ← last_fun_split_fun f g, H]; simp
+theorem split_fun_inj
+  {α α' : fam (I ⊕ J)} {f f' : drop α ⟶ drop α'} {g g' : last α ⟶ last α'}
+  (H : split_fun f g = split_fun f' g') : f = f' ∧ g = g' :=
+by rw [← drop_fun_split_fun f g, H, ← last_fun_split_fun f g, H]; simp
 
 -- theorem append_fun_inj {α α' : typevec n} {β β' : Type*} {f f' : α ⟹ α'} {g g' : β → β'} :
 --   f ::: g = f' ::: g' →  f = f' ∧ g = g' :=
@@ -246,6 +249,7 @@ variables {I J : Type u} {α β γ : fam I} {F : fam I ⥤ fam J}
 --   split_fun (f₁ ⊚ f₀) (g₁ ∘ g₀) = split_fun f₁ g₁ ⊚ split_fun f₀ g₀ :=
 -- eq_of_drop_last_eq (λ _, rfl) rfl
 
+@[reassoc]
 theorem append_fun_comp_split_fun
   {α γ : fam I} {β δ : fam J} {ε : fam (I ⊕ J)}
     (f₀ : fam.drop ε ⟶ fam.drop (α.append1 β)) (f₁ : α ⟶ γ)
@@ -360,15 +364,15 @@ theorem append_fun_comp_split_fun
 -- /- for lifting predicates and relations -/
 
 /-- `pred_last α p x` predicates `p` of the last element of `x : α.append1 β`. -/
-def pred_last (α : fam I) {β : fam J} (p : Π ⦃i⦄, β i → Prop) : Π ⦃i⦄, (α.append1 β) i → Prop
+def pred_last (α : fam I) {β : fam J} (p : Pred β) : Pred (α.append1 β)
 | (sum.inl i) x := true
-| (sum.inr j) x := p x
+| (sum.inr j) x := p _ x
 
--- /-- `rel_last α r x y` says that `p` the last elements of `x y : α.append1 β` are related by `r` and all the other elements are equal. -/
--- def rel_last (α : typevec n) {β γ : Type*} (r : β → γ → Prop) :
---   Π ⦃i⦄, (α.append1 β) i → (α.append1 γ) i → Prop
--- | (fin'.raise i) := eq
--- | fin'.last      := r
+/-- `rel_last α r x y` says that `p` the last elements of `x y : α.append1 β` are related by `r` and all the other elements are equal. -/
+def rel_last (α : fam I) {β γ : fam J} (r : Pred $ β ⊗ γ) :
+  Pred (α.append1 β ⊗ α.append1 γ)
+| (sum.inl i) := function.uncurry eq
+| (sum.inr i) := r _
 
 -- section liftp'
 -- open nat

@@ -190,7 +190,7 @@ theorem W_map_W_mk (g : α ⟶ β)
 begin
   have : f ≫ P.Wp.map g = λ _ i, ⟨(f i).fst, ((f i).snd) ≫ g⟩,
   { ext i x : 2, dsimp [function.comp,(≫)], cases (f x), refl },
-  simp [W_map,this,W_mk,W_mk_eq,pfunctor.map_eq P.Wp g,comp_W_path_cases_on],
+  simp [W_map,this,W_mk,W_mk_eq,pfunctor.map_eq' P.Wp g,comp_W_path_cases_on],
 end
 
 -- TODO: this technical theorem is used in one place in constructing the initial algebra.
@@ -205,7 +205,7 @@ theorem map_apply_append1 {γ : fam J} (g : α ⟶ γ)
   {i} (a : P.A i) (f' : P.drop.B i a ⟶ α) (f : P.last.B i a ⟶ P.W α) :
 P.map (fam.append_fun g (P.W_map g)) (P.apply_append1 a f' f) =
   P.apply_append1 a (f' ≫ g) (f ≫ P.W_map g) :=
-by erw [apply_append1, apply_append1, pfunctor.map_eq, ← fam.split_fun_comp]
+by erw [apply_append1, apply_append1, pfunctor.map_eq', ← fam.split_fun_comp]
 
 /-
 Yet another view of the W type: as a fixed point for a multivariate polynomial functor.
