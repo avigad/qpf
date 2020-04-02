@@ -23,7 +23,7 @@ by cases s₁; cases s₂; cc
 theorem eq_snd {s₁ s₂ : sigma β₁} : s₁ = s₂ → s₁.2 == s₂.2 :=
 by cases s₁; cases s₂; cc
 
-@[extensionality]
+@[ext]
 lemma ext {x₀ x₁ : sigma β₁}
   (h₀ : x₀.1 = x₁.1)
   (h₁ : x₀.1 = x₁.1 → x₀.2 == x₁.2) :
@@ -260,13 +260,6 @@ meta def pred : level → level
 
 end level
 
-namespace declaration
-
-meta def univ_levels (d : declaration) : list level :=
-d.univ_params.map level.param
-
-end declaration
-
 namespace native
 namespace rb_map
 
@@ -427,7 +420,7 @@ do t ← infer_type e,
       pure vs'
 
 meta def extract_def' {α} (n : name) (trusted : bool) (elab_def : tactic α) : tactic α :=
-do cxt ← list.map to_implicit <$> local_context,
+do cxt ← list.map expr.to_implicit_binder <$> local_context,
    t ← target,
    (r,d) ← solve_aux t elab_def,
    d ← instantiate_mvars d,
@@ -739,7 +732,7 @@ end tactic.interactive
 instance subsingleton.fin0 {α} : subsingleton (fin 0 → α) :=
 subsingleton.intro $ λ a b, funext $ λ i, fin.elim0 i
 
-attribute [extensionality] function.hfunext
+attribute [ext] function.hfunext
 
 meta def options.list_names (o : options) : list name := o.fold [] (::)
 

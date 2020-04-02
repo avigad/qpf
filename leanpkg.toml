@@ -1,8 +1,8 @@
 [package]
 name = "qpf"
 version = "0.1"
-lean_version = "leanprover-community/lean:nightly-2019-08-30"
+lean_version = "leanprover-community/lean:3.7.2"
 path = "src"
 
 [dependencies]
-mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "313fe11b10c8c7f000307d28cd85dc27dfef581c"}
+mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "5b972be71d8d71d18d34b810ba43f524bfa6ac3c"}

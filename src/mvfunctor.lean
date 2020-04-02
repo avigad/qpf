@@ -482,7 +482,7 @@ mvfunctor.liftr $ λ i x y, of_repeat $ r i $ prod.mk _ x y
 def append_fun' {α : typevec' n} {β β' : Type*}
   (f : α ⟹ repeat n β') (g : β → β') : append1 α β ⟹ repeat n.succ β' := split_fun f g
 
-lemma d  {α α' : typevec' 1} {β β' : Type*} (f : last α → last α') : @split_fun 0 α α' nil_fun f = nil_fun ::: f := _
+-- lemma d  {α α' : typevec' 1} {β β' : Type*} (f : last α → last α') : @split_fun 0 α α' nil_fun f = nil_fun ::: f := _
 
 variables [mvfunctor.is_lawful F] (F)
 

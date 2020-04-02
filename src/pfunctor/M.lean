@@ -8,7 +8,7 @@ Basic machinery for defining general coinductive types
 Work in progress
 -/
 import data.pfun tactic.interactive ..for_mathlib .basic
-
+       meta.coinductive_predicates
 universes u v w
 
 open nat function list (hiding head')
@@ -24,7 +24,7 @@ inductive cofix_a : ℕ → Type u
 | continue : cofix_a 0
 | intro {n} : ∀ a, (F.B a → cofix_a n) → cofix_a (succ n)
 
-@[extensionality]
+@[ext]
 lemma cofix_a_eq_zero : ∀ x y : cofix_a F 0, x = y
 | (cofix_a.continue _) (cofix_a.continue _) := rfl
 
@@ -605,9 +605,9 @@ end pfunctor
 namespace tactic.interactive
 open tactic (hiding coinduction) lean.parser interactive
 
-meta def bisim (g : parse $ optional (tk "generalizing" *> many ident)) : tactic unit :=
+meta def bisim (ids : parse $ types.with_ident_list) (g : parse $ optional (tk "generalizing" *> many ident)) : tactic unit :=
 do applyc ``pfunctor.M.coinduction,
-   coinduction ``pfunctor.M.R.corec_on g
+   coinduction ``pfunctor.M.R.corec_on ids g
 
 end tactic.interactive
 
@@ -633,7 +633,9 @@ lemma M_bisim (R : M P → M P → Prop)
   ∀ x y, R x y → x = y :=
 begin
   intros,
-  bisim generalizing x y, rename w x; rename h_1_w y; rename h_1_h_left ih,
+  bisim with x y ih generalizing x y,
+  -- rename w x; rename h_1_w y; rename h_1_h_left ih,
+  done,
   rcases h _ _ ih with ⟨ a', f, f', h₀, h₁, h₂ ⟩, clear h, dsimp [M_dest] at h₀ h₁,
   existsi [a',f,f'], split,
   { intro, existsi [f i,f' i,h₂ _,rfl], refl },

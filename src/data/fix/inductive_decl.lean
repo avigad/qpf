@@ -65,7 +65,7 @@ n ∈ decl.ctors.map type_cnstr.name
 
 meta def fresh_univ (xs : list name) (n : name := `u) : name :=
 (((list.iota (xs.length + 1)).reverse.map n.append_after).diff xs).head
-
+open expr (to_implicit_local_const)
 meta def mk_cases_on (decl : inductive_type) : tactic unit :=
 do let u := fresh_univ decl.u_names,
    let idx := decl.idx,
@@ -76,7 +76,7 @@ do let u := fresh_univ decl.u_names,
      do { cn ← get_unused_name "c",
           n ← unify_app (const c.name decl.u_params) $ decl.params ++ c.args,
           pis c.args (C.mk_app $ c.result ++ [n]) >>= mk_local_def cn },
-   t ← pis ((decl.params ++ [C] ++ idx).map to_implicit ++ [n] ++ cases) (C.mk_app (idx ++ [n])),
+   t ← pis ((decl.params ++ [C] ++ idx).map to_implicit_local_const ++ [n] ++ cases) (C.mk_app (idx ++ [n])),
    p ← mk_mapp (decl.name <.> "rec") $ (decl.params ++ [C] ++ cases ++ idx ++ [n]).map some,
    p ← lambdas (decl.params ++ [C] ++ idx ++ [n] ++ cases) p,
    d ← instantiate_mvars p,
@@ -111,7 +111,7 @@ do let cases_on_n := decl.mk_name "cases_on",
    (>>= list_meta_vars) <$> cs.mmap instantiate_mvars.
 
 meta def mk_no_confusion_type (decl : inductive_type) : tactic unit :=
-do let params := decl.params.map to_implicit,
+do let params := decl.params.map to_implicit_local_const,
    let t := (const decl.name $ decl.u_params).mk_app $ params ++ decl.idx,
    let u := fresh_univ decl.u_names,
    let cases_on_n := decl.mk_name "cases_on",
@@ -139,7 +139,7 @@ do let params := decl.params.map to_implicit,
 run_cmd mk_simp_attr `pseudo_eqn
 
 meta def mk_no_confusion (decl : inductive_type) : tactic unit :=
-do let params := decl.params.map to_implicit,
+do let params := decl.params.map to_implicit_local_const,
    let t := (const decl.name $ decl.u_params).mk_app $ params ++ decl.idx,
    let u := fresh_univ decl.u_names,
    v1 ← mk_local_def `v1 t,
@@ -147,7 +147,7 @@ do let params := decl.params.map to_implicit,
    P  ← mk_local_def `P (expr.sort $ level.param u),
    type ← mk_const (decl.mk_name "no_confusion_type"),
    Heq ← mk_app `eq [v1,v2] >>= mk_local_def `Heq,
-   let vs := (params ++ decl.idx ++ [P,v1,v2]).map to_implicit,
+   let vs := (params ++ decl.idx ++ [P,v1,v2]).map to_implicit_local_const,
    p ← unify_app type vs,
    let vs := vs ++ [Heq],
    (_,pr) ← solve_aux p $
@@ -184,8 +184,8 @@ do let sig_c  : expr := const decl.name decl.u_params,
    ts ← vs.mmap infer_type,
    let params : list expr := match i with
                              | implicit := decl.params
-                             | relaxed_implicit := decl.params.map to_implicit
-                             | none := decl.params.map $ λ v, if v ∈ ts then to_implicit v
+                             | relaxed_implicit := decl.params.map to_implicit_local_const
+                             | none := decl.params.map $ λ v, if v ∈ ts then to_implicit_local_const v
                                                                         else v
                              end,
    tactic.pis vs (sig_c.mk_app' [decl.params,r]) >>= pis params
@@ -201,8 +201,8 @@ do opt ← get_options,
 open interactive
 
 meta def implicit_infer_kind_of (us : list expr) : implicit_infer_kind :=
-let b₀ := us.all $ λ v, v.local_binder_info = binder_info.default,
-    b₁ := us.all $ λ v, v.local_binder_info ≠ binder_info.default in
+let b₀ := us.all $ λ v, v.local_binding_info = binder_info.default,
+    b₁ := us.all $ λ v, v.local_binding_info ≠ binder_info.default in
 if b₀ then if b₁ then implicit
                  else none
 else if b₁ then relaxed_implicit
