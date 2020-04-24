@@ -44,11 +44,11 @@ include q q'
 instance : mvqpf (comp F G) :=
 { P         := mvpfunctor.comp (P F) (λ i, P $ G i),
   abs       := λ α, comp.mk ∘ map (λ i, abs) ∘ abs ∘ mvpfunctor.comp.get,
-  repr'     := λ α,  mvpfunctor.comp.mk ∘ repr ∘
+  repr      := λ α,  mvpfunctor.comp.mk ∘ repr ∘
                  map (λ i, (repr : G i α → (λ (i : fin' n), apply (P (G i)) α) i)) ∘ comp.get,
-  abs_repr' := by { intros, simp [(∘), mvfunctor.map_map, (⊚), abs_repr] },
+  abs_repr  := by { intros, simp [(∘), mvfunctor.map_map, (⊚), abs_repr] },
   abs_map   := by { intros, simp [(∘)], rw [← abs_map],
-                    simp [id_map, (⊚), map_mk, mvpfunctor.comp.get_map, abs_map,
+                    simp [mvfunctor.id_map, (⊚), map_mk, mvpfunctor.comp.get_map, abs_map,
                       mvfunctor.map_map, abs_repr] } }
 
 end comp

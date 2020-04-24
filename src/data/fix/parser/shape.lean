@@ -35,9 +35,8 @@ do v ← mk_local_def (fresh_univ (d.params.map expr.local_pp_name) `α) d.type,
               type := d.type,
               ctors := d.ctors.map (replace_rec_occ d.name (d.name <.> "shape") c' v) })
 
-meta def mk_shape_functor' (d : interactive.inductive_decl) : tactic (datatype_shape × internal_mvfunctor) :=
-do d ← inductive_type.of_decl d,
-   func' ← internalize_mvfunctor d,
+meta def mk_shape_functor' (d : inductive_type) : tactic (datatype_shape × internal_mvfunctor) :=
+do func' ← internalize_mvfunctor d,
    (v,func) ← mk_shape_decl d,
    mk_inductive func,
    func ← internalize_mvfunctor func,
@@ -58,6 +57,7 @@ do let dead := func.dead_params,
    df ← (mk_mapp fix [none,shape,none,none] >>= lambdas dead : tactic _),
    t ← infer_type df,
    let intl_n := func.decl.to_name.get_prefix <.> "internal",
+   updateex_env $ λ env, pure $ env.add_namespace intl_n,
    add_decl $ mk_definition intl_n func.induct.u_names t df,
    v ← mk_live_vec func.vec_lvl $ func.live_params.init,
    df ← lambdas d.params $ (@const tt intl_n func.induct.u_params).mk_app func.dead_params v,
@@ -68,8 +68,12 @@ do let dead := func.dead_params,
 meta def timetac' {α : Type*} (_ : string) (tac : thunk (tactic α)) : tactic α :=
 tac ()
 
+meta def get_type_spec (n : name) : tactic inductive_type :=
+mk_const (n <.> "_spec") >>= eval_expr _
+
 meta def mk_datatype (iter : name) (d : inductive_decl) : tactic (datatype_shape × internal_mvfunctor) :=
-do (func', d) ← mk_shape_functor' d,
+do dt ← inductive_type.of_decl d,
+   (func', d) ← mk_shape_functor' dt,
    let func : internal_mvfunctor := { .. func' },
    timetac' "mk_mvfunctor_instance" $ mk_mvfunctor_instance func,
    mk_pfunctor func,
@@ -77,6 +81,11 @@ do (func', d) ← mk_shape_functor' d,
    timetac' "mk_pfunc_recursor" $ mk_pfunc_recursor func,
    timetac' "mk_mvqpf_instance" $ mk_mvqpf_instance func,
    timetac' "mk_fixpoint" $ mk_fixpoint iter func d,
+   updateex_env $ λ env, pure $ env.add_namespace d.induct.name,
+   updateex_env $ λ env, pure $ env.add_namespace func'.induct.name,
+   let spec : inductive_type := func.induct,
+   add_meta_definition (d.induct.name <.> "_spec") [] `(inductive_type) `(dt),
+
    mk_liftp_defn' func,
    mk_liftp_eqns₀ func,
    mk_liftp_eqns₁ func,

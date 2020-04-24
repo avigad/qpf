@@ -26,7 +26,7 @@ inductive cofix_a : ℕ → Type u
 
 @[ext]
 lemma cofix_a_eq_zero : ∀ x y : cofix_a F 0, x = y
-| (cofix_a.continue _) (cofix_a.continue _) := rfl
+| cofix_a.continue cofix_a.continue := rfl
 
 variables {F}
 
@@ -68,7 +68,7 @@ end
 
 def truncate
 : ∀ {n : ℕ}, cofix_a F (n+1) → cofix_a F n
- | 0 (cofix_a.intro _ _) := cofix_a.continue _
+ | 0 (cofix_a.intro _ _) := cofix_a.continue
  | (succ n) (cofix_a.intro i f) := cofix_a.intro i $ truncate ∘ f
 
 lemma truncate_eq_of_agree {n : ℕ}
@@ -91,7 +91,7 @@ variables {X : Type w}
 variables (f : X → F.apply X)
 
 def s_corec : Π (i : X) n, cofix_a F n
- | _ 0 := cofix_a.continue _
+ | _ 0 := cofix_a.continue
  | j (succ n) :=
    let ⟨y,g⟩ := f j in
    cofix_a.intro y (λ i, s_corec (g i) _)
@@ -213,7 +213,7 @@ def from_cofix : M F → F.apply (M F)
 namespace approx
 
 protected def s_mk (x : F.apply $ M F) : Π n, cofix_a F n
- | 0 :=  cofix_a.continue _
+ | 0 :=  cofix_a.continue
  | (succ n) := cofix_a.intro x.1 (λ i, (x.2 i).approx n)
 
 protected def P_mk  (x : F.apply $ M F)
@@ -634,8 +634,6 @@ lemma M_bisim (R : M P → M P → Prop)
 begin
   intros,
   bisim with x y ih generalizing x y,
-  -- rename w x; rename h_1_w y; rename h_1_h_left ih,
-  done,
   rcases h _ _ ih with ⟨ a', f, f', h₀, h₁, h₂ ⟩, clear h, dsimp [M_dest] at h₀ h₁,
   existsi [a',f,f'], split,
   { intro, existsi [f i,f' i,h₂ _,rfl], refl },

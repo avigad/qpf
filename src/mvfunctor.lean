@@ -101,16 +101,22 @@ class is_lawful {n : ℕ} (F : typevec n → Type*) [mvfunctor F] : Prop :=
 (comp_map     : Π {α β γ : typevec n} (g : α ⟹ β) (h : β ⟹ γ) (x : F α),
                     (h ⊚ g) <$$> x = h <$$> g <$$> x)
 
-export mvfunctor.is_lawful
-attribute [simp] id_map
+export mvfunctor.is_lawful (comp_map)
+open mvfunctor.is_lawful
+-- attribute [simp] id_map
 
 variables {n : ℕ} {α β γ : typevec.{u} n}
 variables {F : typevec.{u} n → Type v} [mvfunctor F] [is_lawful F]
 
 @[simp]
+lemma id_map (x : F α) :
+  typevec.id <$$> x = x :=
+id_map x
+
+@[simp]
 lemma id_map' (x : F α) :
   (λ i a, a) <$$> x = x :=
-id_map n x
+id_map x
 
 lemma map_map (g : α ⟹ β) (h : β ⟹ γ) (x : F α) :
   h <$$> g <$$> x = (h ⊚ g) <$$> x :=
@@ -398,6 +404,12 @@ def repeat_eq : Π {n} (α : typevec n), α ⊗ α ⟹ repeat _ Prop
 lemma const_append1 {β γ} (x : γ) {n} (α : typevec n) : typevec.const x (α ::: β) = append_fun (typevec.const x α) (λ _, x) :=
 by ext i : 1; cases i; refl
 
+lemma eq_nil_fun {α β : typevec 0} (f : α ⟹ β) : f = nil_fun :=
+by ext x; cases x
+
+lemma id_eq_nil_fun {α : typevec 0} : @id _ α = nil_fun :=
+by ext x; cases x
+
 lemma const_nil {β} (x : β) (α : typevec 0) : typevec.const x α = nil_fun :=
 by ext i : 1; cases i; refl
 
@@ -439,9 +451,33 @@ def prod.snd : Π {n} {α β : typevec.{u} n}, α ⊗ β ⟹ β
 | (succ n) α β (fin'.raise i) := @prod.snd _ (drop α) (drop β) i
 | (succ n) α β fin'.last := _root_.prod.snd
 
+def prod.diag : Π {n} {α : typevec.{u} n}, α ⟹ α ⊗ α
+| (succ n) α (fin'.raise i) x := @prod.diag _ (drop α) _ x
+| (succ n) α fin'.last x := (x,x)
+
 def prod.mk : Π {n} {α β : typevec.{u} n} (i : fin' n), α i → β i → (α ⊗ β) i
 | (succ n) α β (fin'.raise i) := prod.mk i
 | (succ n) α β fin'.last := _root_.prod.mk
+
+def prod.arrow_mk : Π {n} {α α' β β' : typevec.{u} n}, (α ⟹ β) → (α' ⟹ β') → α ⊗ α' ⟹ β ⊗ β'
+| (succ n) α α' β β' x y (fin'.raise i) a := @prod.arrow_mk _ (drop α) (drop α') (drop β) (drop β') (drop_fun x) (drop_fun y) _ a
+| (succ n) α α' β β' x y fin'.last a := (x _ a.1,y _ a.2)
+
+infix ` ⊗ `:45 := prod.arrow_mk
+
+theorem fst_prod_mk {α α' β β' : typevec n} (f : α ⟹ β) (g : α' ⟹ β') :
+  typevec.prod.fst ⊚ (f ⊗ g) = f ⊚ typevec.prod.fst :=
+by ext i; induction i; [apply i_ih, refl]
+
+theorem snd_prod_mk {α α' β β' : typevec n} (f : α ⟹ β) (g : α' ⟹ β') :
+  typevec.prod.snd ⊚ (f ⊗ g) = g ⊚ typevec.prod.snd :=
+by ext i; induction i; [apply i_ih, refl]
+
+theorem fst_diag {α : typevec n} : typevec.prod.fst ⊚ (prod.diag : α ⟹ _) = id :=
+by ext i; induction i; [apply i_ih, refl]
+
+theorem snd_diag {α : typevec n} : typevec.prod.snd ⊚ (prod.diag : α ⟹ _) = id :=
+by ext i; induction i; [apply i_ih, refl]
 
 lemma repeat_eq_iff_eq {α : typevec n} {i x y} : of_repeat (repeat_eq α i (prod.mk _ x y)) ↔ x = y :=
 by induction i; [erw [repeat_eq,@i_ih (drop α) x y], refl]
@@ -470,8 +506,29 @@ def of_subtype' : Π {n} {α : typevec.{u} n} (p : α ⊗ α ⟹ repeat n Prop),
 | (succ n) α p (fin'.raise i) x := of_subtype' _ i x
 | (succ n) α p fin'.last x := ⟨x.val,cast (by congr; simp [prod.mk]) x.property⟩
 
+def diag_sub  : Π {n} {α : typevec.{u} n}, α ⟹ subtype_ (repeat_eq α)
+| (succ n) α (fin'.raise i) x := @diag_sub _ (drop α) _ x
+| (succ n) α fin'.last x := ⟨(x,x), rfl⟩
+
 lemma subtype_val_nil {α : typevec.{u} 0} (ps : α ⟹ repeat 0 Prop) : typevec.subtype_val ps = nil_fun :=
 funext $ by rintro ⟨ ⟩; refl
+
+lemma diag_sub_val {n} {α : typevec.{u} n} :
+  subtype_val (repeat_eq α) ⊚ diag_sub = prod.diag :=
+by ext i; induction i; [apply i_ih, refl]
+
+lemma prod_id : Π {n} {α β : typevec.{u} n}, (id ⊗ id) = (id : α ⊗ β ⟹ _) :=
+begin
+  intros, ext i a, induction i, apply i_ih,
+  cases a, refl,
+end
+
+lemma append_prod_append_fun {n} {α α' β β' : typevec.{u} n}
+  {φ φ' ψ ψ' : Type u}
+  {f₀ : α ⟹ α'} {g₀ : β ⟹ β'}
+  {f₁ : φ → φ'}  {g₁ : ψ → ψ'} :
+  (f₀ ⊗ g₀) ::: prod.map f₁ g₁ = ((f₀ ::: f₁) ⊗ (g₀ ::: g₁)) :=
+by ext i a; cases i; [skip, cases a]; refl
 
 def liftp' : F α → Prop :=
 mvfunctor.liftp $ λ i x, of_repeat $ p i x

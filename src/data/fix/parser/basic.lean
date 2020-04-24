@@ -70,7 +70,7 @@ def no_print {α} (x : string) (y : α) := y
 meta instance no_print.has_to_format {msg : string} (x : Sort*) : has_to_format (no_print msg x) :=
 ⟨ λ _, format!"⟨ {msg} ⟩" ⟩
 
-attribute [derive has_to_format] reducibility_hints type_cnstr inductive_type
+attribute [derive has_to_format] reducibility_hints
 
 meta def both {α} : α ⊕ α → α
 | (sum.inl x) := x
@@ -299,7 +299,7 @@ do let live := xs.filter_map $ get_right id,
    pure (v,v',f)
 
 meta def mk_functor_map (func : internal_mvfunctor) : tactic expr :=
-do params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit) mk_fn_var,
+do params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit_local_const) mk_fn_var,
    let F := (@const tt func.induct.name func.induct.u_params).mk_app $ params.map $ elim id fn_var.dom,
    let F' := (@const tt func.induct.name func.induct.u_params).mk_app $ params.map $ elim id fn_var.codom,
    x ← mk_local_def `x F,
@@ -349,9 +349,11 @@ do env ← get_env,
          { intros >> reflexivity },
        let n := func.map_name <.> ("_equation_" ++ to_string i),
        d ← add_decl' $ declaration.thm n decl.univ_params eqn pr,
+       add_eqn_lemmas n,
        simp_attr.typevec.set n () tt,
        let n := func.induct.name <.> "map" <.> ("_equation_" ++ to_string i),
        d ← add_decl' $ declaration.thm n decl.univ_params eqn' pr,
+       add_eqn_lemmas n,
        simp_attr.typevec.set n () tt,
        pure () }
 
@@ -650,7 +652,7 @@ do let u := fresh_univ func.induct.u_names,
               reflexivity <|> (congr; ext [rcases_patt.many [[rcases_patt.one `_]]] none; reflexivity),
               done }) cases_t gs hs,
        pure () },
-   let vs := [func.params.map expr.to_implicit_binder, C :: cases_t.map prod.snd],
+   let vs := [func.params.map expr.to_implicit_local_const, C :: cases_t.map prod.snd],
    df ← instantiate_mvars df >>= lambdas' vs,
    t ← pis' (vs ++ [[n]]) (C n),
    add_decl $ mk_definition (func.pfunctor_name <.> "rec") (u :: func.induct.u_names) t df,
@@ -673,6 +675,7 @@ do let u := fresh_univ func.induct.u_names,
      { intros, reflexivity },
      let n := cn.append_suffix "_rec",
      add_decl $ declaration.thm n (u :: func.induct.u_names) t df,
+     add_eqn_lemmas n,
      simp_attr.typevec.set n () tt }) func.induct.ctors fs,
    skip
 
@@ -803,7 +806,7 @@ do let n := func.live_params.length,
    mvqpf_t ← mk_mapp ``mvqpf [some (reflect n),e,pfunctor_i] >>= instantiate_mvars,
    (_,df) ← solve_aux mvqpf_t $ do
      { let p := (@const tt func.pfunctor_name func.induct.u_params).mk_app dead_params,
-       refine ``( { P := %%p, abs := %%abs_fn, repr' := %%repr_fn, .. } ),
+       refine ``( { P := %%p, abs := %%abs_fn, repr := %%repr_fn, .. } ),
        prove_goal_async' dead_params $ prove_abs_repr func,
        prove_goal_async' dead_params $ prove_abs_map func },
    df ← instantiate_mvars df >>= lambdas dead_params,
@@ -847,7 +850,7 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
          (some f) ← pure $ m.find rhs_t | pure [],
          list.ret <$> pis args (f $ arg.mk_app args) },
      let rhs := mk_conj args.join,
-     t ← pis (c.args.map to_implicit) $ (df x').imp rhs,
+     t ← pis (c.args.map to_implicit_local_const) $ (df x').imp rhs,
      df ← solve_async [func.params,fs] t $ do
      { solve1 $ do
        { args ← intron' c.args.length,
@@ -874,7 +877,7 @@ do let my_t := (@const tt func.induct.name func.induct.u_params).mk_app func.par
          intros, applyc ``subtype.property <|> interactive.trivial,
          done },
        done },
-     t ← pis ((func.params ++ fs).map to_implicit) t,
+     t ← pis ((func.params ++ fs).map to_implicit_local_const) t,
      let n := c.name.append_suffix "_liftp",
      add_decl $ declaration.thm n func.induct.u_names t df },
    skip
@@ -891,7 +894,7 @@ meta def mk_exists : list expr → expr → tactic expr
 meta def mk_liftp_defn' (func : internal_mvfunctor) : tactic unit :=
 do let F := (@const tt func.induct.name func.induct.u_params).mk_app func.params,
    x ← mk_local_def `x F,
-   params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit) mk_pred_var,
+   params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit_local_const) mk_pred_var,
    let fs := params.filter_map $ get_right prod.snd,
    let m := rb_map.of_list $ list.zip func.live_params fs,
    let n := func.induct.name <.> "liftp",
@@ -921,7 +924,7 @@ do let F := (@const tt func.induct.name func.induct.u_params).mk_app func.params
 meta def mk_liftr_defn' (func : internal_mvfunctor) : tactic unit :=
 do let F := (@const tt func.induct.name func.induct.u_params).mk_app func.params,
    x ← mk_local_def `x F, y ← mk_local_def `y F,
-   params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit) mk_rel_var,
+   params ← func.params'.mmap $ bitraverse (pure ∘ to_implicit_local_const) mk_rel_var,
    let fs := params.filter_map $ get_right prod.snd,
    let m := rb_map.of_list $ list.zip func.live_params fs,
    let n := func.induct.name <.> "liftr",
@@ -1032,7 +1035,7 @@ do params ← func.params'.mmap_live' mk_pred_var,
    let fs := params.filter_map $ get_right prod.snd,
    map_f ← mk_map_vec func.vec_lvl func.vec_lvl fs,
    x ← mk_local_def `x F,
-   let vs := [params.bind $ decls' ∘ bimap to_implicit (bimap to_implicit id),[x]],
+   let vs := [params.bind $ decls' ∘ bimap to_implicit_local_const (bimap to_implicit_local_const id),[x]],
    liftp ← mk_mapp ``typevec.liftp' [`(n),F_intl,none,vec],
    let df := liftp map_f x,
    mk_const ``typevec.liftp_def,
@@ -1133,7 +1136,7 @@ do params ← func.params'.mmap_live' mk_rel_var,
      mk_mapp ``function.uncurry [none,none,none,f],
    map_f ← mk_map_vec func.vec_lvl func.vec_lvl fs,
    x ← mk_local_def `x F, y ← mk_local_def `y F,
-   let vs := [params.bind $ decls' ∘ bimap to_implicit (bimap to_implicit id),[x,y]],
+   let vs := [params.bind $ decls' ∘ bimap to_implicit_local_const (bimap to_implicit_local_const id),[x,y]],
    liftr ← mk_mapp ``typevec.liftr' [`(n),F_intl,none,vec],
    let df := liftr map_f x y,
    mk_const ``typevec.liftr_def,
@@ -1246,7 +1249,7 @@ do let F := (@const tt func.induct.name func.univ_params).mk_app func.params,
 --      mk_mapp ``function.uncurry [none,none,none,f],
 --    map_f ← mk_map_vec func.vec_lvl func.vec_lvl fs,
 --    x ← mk_local_def `x F, y ← mk_local_def `y F,
---    let vs := [params.bind $ decls' ∘ bimap to_implicit (bimap to_implicit id),[x,y]],
+--    let vs := [params.bind $ decls' ∘ bimap to_implicit_local_const (bimap to_implicit_local_const id),[x,y]],
 --    x' ← mk_eq_mpr internal_eq x, y' ← mk_eq_mpr internal_eq y,
 --    liftr ← mk_mapp ``typevec.liftr' [`(n),F_intl,none,vec],
 --    t ← pis' vs `(Prop),
@@ -1330,7 +1333,7 @@ do let F := (@const tt func.induct.name func.univ_params).mk_app func.params,
 --      trace "• 2",
 --      -- let rhs := mk_conj args'.join,
 --      let args' := args'.join,
---      t ← pis ((c.args ++ args).map to_implicit) $ args'.foldr (λ l r, l.imp r) (df e₀ e₁),
+--      t ← pis ((c.args ++ args).map to_implicit_local_const) $ args'.foldr (λ l r, l.imp r) (df e₀ e₁),
 --      trace t,
 --      (_,df) ← solve_aux t $ do
 --      { solve1 $ do
@@ -1377,7 +1380,7 @@ do let F := (@const tt func.induct.name func.univ_params).mk_app func.params,
 --          -- intros, applyc ``subtype.property <|> interactive.trivial,
 --          done },
 --        done },
---      t ← pis ((params.bind decls').map to_implicit) t,
+--      t ← pis ((params.bind decls').map to_implicit_local_const) t,
 --      df ← instantiate_mvars df >>= lambdas (params.bind decls'),
 --      -- trace_state,
 --      -- add_decl $ declaration.thm (c.name.append_suffix "_liftr") func.induct.u_names t (pure df),
@@ -1419,3 +1422,5 @@ open function typevec typevec.prod
 inductive tree' (α β γ : Type)
 | cons : β → α → (β → α) → tree'
 | nil : γ → tree'
+-- todo: nesting
+-- #print prefix tree'

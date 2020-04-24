@@ -10,7 +10,9 @@ open expr
 open environment ( implicit_infer_kind intro_rule ) environment.implicit_infer_kind
 
 attribute [derive has_to_format] binder_info implicit_infer_kind
+attribute [derive has_reflect] implicit_infer_kind
 
+@[derive [has_reflect,has_to_format]]
 meta structure type_cnstr :=
 (name : name)
 (args : list expr)
@@ -24,7 +26,7 @@ meta instance : has_to_format type_cnstr :=
 { to_format := λ ⟨n,a,r,_⟩, format!"{n} : {expr.pis a $ (@const tt `type []).mk_app r}" }
 
 
--- @[derive [has_reflect,has_to_format]]
+@[derive [has_reflect,has_to_format]]
 meta structure inductive_type :=
 (pre : name)
 (name : name)
@@ -193,6 +195,7 @@ do let sig_c  : expr := const decl.name decl.u_params,
 meta def mk_inductive : inductive_type → tactic unit
 | decl :=
 do opt ← get_options,
+   updateex_env $ λ env, pure $ env.add_namespace decl.name,
    updateex_env $ λ e : environment,
      e.add_ginductive opt decl.u_names decl.params
      [((decl.name,decl.type.pis decl.idx),decl.ctors.map $ type_cnstr.to_intro_rule decl)] ff,

@@ -214,13 +214,13 @@ begin
   rw [fix.dest, fix.rec_eq, ←comp_map, ←append_fun_comp, id_comp],
   intro h, rw h,
   show fix.mk (append_fun id id <$$> x) = fix.mk x,
-  rw [append_fun_id_id, id_map]
+  rw [append_fun_id_id, mvfunctor.id_map]
 end
 
 theorem fix.dest_mk (x : F (append1 α (fix F α))) : fix.dest (fix.mk x) = x :=
 begin
   unfold fix.dest, rw [fix.rec_eq, ←fix.dest, ←comp_map],
-  conv { to_rhs, rw ←(id_map x) },
+  conv { to_rhs, rw ←(mvfunctor.id_map x) },
   rw [←append_fun_comp, id_comp],
   have : fix.mk ∘ fix.dest = id, {ext x, apply fix.mk_dest },
   rw [this, append_fun_id_id]
@@ -246,8 +246,8 @@ end
 instance mvqpf_fix : mvqpf (fix F) :=
 { P         := q.P.Wp,
   abs       := λ α, quot.mk Wequiv,
-  repr'     := λ α, fix_to_W,
-  abs_repr' := by { intros α, apply quot.ind, intro a, apply quot.sound, apply Wrepr_equiv },
+  repr      := λ α, fix_to_W,
+  abs_repr  := by { intros α, apply quot.ind, intro a, apply quot.sound, apply Wrepr_equiv },
   abs_map   :=
     begin
       intros α β g x, conv { to_rhs, dsimp [mvfunctor.map]},

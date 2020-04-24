@@ -11,8 +11,8 @@ universe u
 class mvqpf {n : ℕ} (F : typevec.{u} n → Type*) [mvfunctor F] :=
 (P         : mvpfunctor.{u} n)
 (abs       : Π {α}, P.apply α → F α)
-(repr'     : Π {α}, F α → P.apply α)
-(abs_repr' : ∀ {α} (x : F α), abs (repr' x) = x)
+(repr      : Π {α}, F α → P.apply α)
+(abs_repr  : ∀ {α} (x : F α), abs (repr x) = x)
 (abs_map   : ∀ {α β} (f : α ⟹ β) (p : P.apply α), abs (f <$$> p) = f <$$> abs p)
 
 namespace mvqpf
@@ -20,16 +20,16 @@ variables {n : ℕ} {F : typevec.{u} n → Type*} [mvfunctor F] [q : mvqpf F]
 include q
 open mvfunctor (liftp liftr)
 
-def repr {α : typevec n} (x : F α) := repr' n x
+-- def repr {α : typevec n} (x : F α) := repr' x
 
-theorem abs_repr {α : typevec n} (x : F α) : abs (repr x) = x :=
-abs_repr' n x
+-- theorem abs_repr {α : typevec n} (x : F α) : abs (repr x) = x :=
+-- abs_repr' x
 
 /-
 Show that every mvqpf is a lawful mvfunctor.
 -/
 
-theorem id_map {α : typevec n} (x : F α) : typevec.id <$$> x = x :=
+protected theorem id_map {α : typevec n} (x : F α) : typevec.id <$$> x = x :=
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map], reflexivity }
 
 theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) (x : F α) :
@@ -37,7 +37,7 @@ theorem comp_map {α β γ : typevec n} (f : α ⟹ β) (g : β ⟹ γ) (x : F �
 by { rw ←abs_repr x, cases repr x with a f, rw [←abs_map, ←abs_map, ←abs_map], reflexivity }
 
 instance is_lawful_mvfunctor : mvfunctor.is_lawful F :=
-{ id_map := @id_map n F _ _,
+{ id_map := @mvqpf.id_map n F _ _,
   comp_map := @comp_map n F _ _ }
 
 /- Lifting predicates and relations -/

@@ -4,9 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Simon Hudon
 -/
 import data.pfun category.functor category.applicative data.list.sort data.list.basic
-import category.bitraversable.instances
+import category.bitraversable.instances data.fin
 
-universes u v
+import data.lazy_list2
+universes u v w
 
 lemma eq_mp_heq :
   ∀ {α β : Sort*} {a : α} {a' : β} (h₂ : a == a'), (eq.mp (type_eq_of_heq h₂) a) = a'
@@ -199,6 +200,10 @@ def foldr.eval {α β} (x : foldr α β) : α → α := x
 
 def foldl.eval {α β} (x : foldl α β) : α → α := x
 
+def foldr.mk {α β} (x : α → α) : foldr α β := x
+
+def foldl.mk {α β} (x : α → α) : foldl α β := x
+
 def foldl.cons {α β} (x : α) : foldl (list α) β :=
 list.cons x
 
@@ -217,14 +222,14 @@ instance {α : Type u} : traversable (prod.{u u} α) :=
 { map := λ β γ f (x : α × β), prod.mk x.1 $ f x.2,
   traverse := λ m _ β γ f (x : α × β), by exactI prod.mk x.1 <$> f x.2 }
 
-namespace traversable
+-- namespace traversable
 
-variables {t : Type u → Type u} [traversable t]
+-- variables {t : Type u → Type u} [traversable t]
 
-def to_list {α} (x : t α) : list α :=
-@functor.foldr.eval _ (t punit) (traverse functor.foldr.cons x) []
+-- -- def to_list {α} (x : t α) : list α :=
+-- -- @functor.foldr.eval _ (t punit) (traverse functor.foldr.cons x) []
 
-end traversable
+-- end traversable
 
 
 namespace name
@@ -302,6 +307,10 @@ end native
 
 namespace expr
 
+meta def is_local_constant' {elab} : expr elab → bool
+| (expr.local_const _ _ _ _) := tt
+| _ := ff
+
 meta def replace_all (e : expr) (p : expr → Prop) [decidable_pred p] (r : expr) : expr :=
 e.replace $ λ e i, guard (p e) >> pure (r.lift_vars 0 i)
 
@@ -321,6 +330,14 @@ match e' with
 | _ := s
 end
 
+meta def list_univ (e : expr) : list level :=
+e.fold [] $ λ e' i s,
+match e' with
+| (sort u) := s.insert u
+| (const _ ls) := s ∪ ls
+| _ := s
+end
+
 meta def instantiate_pi : expr → list expr → expr
 | (expr.pi n bi d b) (e::es) := instantiate_pi (b.instantiate_var e) es
 | e _ := e
@@ -328,9 +345,42 @@ meta def instantiate_pi : expr → list expr → expr
 meta def mk_app' (e : expr) (xs : list $ list expr) : expr :=
 xs.foldl mk_app e
 
+-- meta def replace_aux {elab} (f : expr elab → ℕ → option (expr elab)) : expr elab → ℕ → option (expr elab)
+-- | e@(var a) i := f e i
+-- | e@(sort a) i := f e i
+-- | e@(const a a_1) i := f e i
+-- | e@(mvar unique pretty type) i := f e i
+-- | e@(local_const unique pretty bi type) i x := fold_aux type i (f e i x)
+-- | e@(app fn arg) i x := fold_aux arg i $ fold_aux fn i (f e i x)
+-- | e@(lam var_name bi var_type body) i x := fold_aux body (i+1) $ fold_aux var_type i (f e i x)
+-- | e@(pi var_name bi var_type body) i x := fold_aux body (i+1) $ fold_aux var_type i (f e i x)
+-- | e@(elet var_name type assignment body) i x := fold_aux body (i+1) $ fold_aux assignment i $ fold_aux type i (f e i x)
+-- | e@(macro a xs) i x := xs.foldl (λ acc x, fold_aux x i acc) (f e i x)
+
+-- meta def fold_aux {α elab} (f : expr elab → ℕ → α → α) : expr elab → ℕ → α → α
+-- | e@(var a) i x := f e i x
+-- | e@(sort a) i x := f e i x
+-- | e@(const a a_1) i x := f e i x
+-- | e@(mvar unique pretty type) i x := fold_aux type i $ f e i x
+-- | e@(local_const unique pretty bi type) i x := fold_aux type i (f e i x)
+-- | e@(app fn arg) i x := fold_aux arg i $ fold_aux fn i (f e i x)
+-- | e@(lam var_name bi var_type body) i x := fold_aux body (i+1) $ fold_aux var_type i (f e i x)
+-- | e@(pi var_name bi var_type body) i x := fold_aux body (i+1) $ fold_aux var_type i (f e i x)
+-- | e@(elet var_name type assignment body) i x := fold_aux body (i+1) $ fold_aux assignment i $ fold_aux type i (f e i x)
+-- | e@(macro a xs) i x := xs.foldl (λ acc x, fold_aux x i acc) (f e i x)
+
+-- meta def fold' {α elab} (f : expr elab → ℕ → α → α) (e : expr elab) : α → α :=
+-- fold_aux f e 0
+
 end expr
 
 namespace tactic
+
+meta def instantiate_unify_pi : expr → list expr → tactic expr
+| (expr.pi n bi d b) (e::es) :=
+  do infer_type e >>= unify d,
+     instantiate_unify_pi (b.instantiate_var e) es
+| e _ := pure e
 
 meta def unify_univ (u u' : level) : tactic unit :=
 unify (expr.sort u) (expr.sort u')
@@ -593,7 +643,7 @@ do
   | const n _           :=
     (do b ← is_valid_simp_lemma_cnst n, guard b, save_const_type_info n ref, s ← s.add_simp n, return (s, u))
     <|>
-    (do eqns ← get_eqn_lemmas_for tt n, guard (eqns.length > 0), save_const_type_info n ref, s ← add_simps s eqns, return (s, u))
+    (do eqns ← get_eqn_lemmas_for tt tt n, guard (eqns.length > 0), save_const_type_info n ref, s ← add_simps s eqns, return (s, u))
     <|>
     (do env ← get_env, guard (env.is_projection n).is_some, return (s, n::u))
     <|>
@@ -782,6 +832,17 @@ meta def on_error {α β} (tac : tactic α) (hdl : tactic β) : tactic α
        | (result.exception a a_1 s) := (hdl >> result.exception a a_1) s
        end
 
+meta def finally {α β} (tac : tactic α) (hdl : tactic β) : tactic α :=
+on_error tac hdl <* hdl
+
+-- meta def brackets {α β} (tac : tactic α) (hdl : tactic β) : tactic α :=
+-- on_error tac hdl <* hdl
+
+meta def with_options {α} (xs : list name) (tac : tactic α) : tactic α :=
+do opt ← tactic.get_options,
+   tactic.set_options $ xs.foldl (λ o n, o.set_bool n tt) opt,
+   finally tac (tactic.set_options opt)
+
 meta def trace_scope {α} (tac : tactic α) (n : name . enclosing_name) : tactic α :=
 do trace!"• begin {n}",
    r ← on_error tac (trace!"• error in {n}"),
@@ -881,3 +942,82 @@ meta def mmap_reversed_live' (f : β → m γ) (xs : list $ α ⊕ β) : m (list
 mmap_reversed (mmap_live f) xs
 
 end list
+
+namespace lazy_list
+
+protected def pure {α} (x : α) : lazy_list α :=
+lazy_list.cons x lazy_list.nil
+
+protected def bind {α β} : lazy_list α → (α → lazy_list β) → lazy_list β
+| lazy_list.nil _ := lazy_list.nil
+| (lazy_list.cons x xs) f := (f x).append (bind (xs ()) f)
+
+instance : monad lazy_list :=
+{ pure := @lazy_list.pure,
+  bind := @lazy_list.bind }
+
+variables
+{α β γ : Type u}
+(x : α) (x' : lazy_list α)
+(f : α → lazy_list β)
+(g : β → lazy_list γ)
+
+lemma append_nil (xs : lazy_list α) : xs.append nil = xs :=
+begin
+  induction xs; simp only [*, true_and, eq_self_iff_true, append],
+  ext ⟨ ⟩; refl
+end
+
+lemma append_assoc (xs ys zs : lazy_list α) : (xs.append ys).append zs = xs.append (ys.append zs) :=
+by induction xs; simp only [*, true_and, eq_self_iff_true, append]
+
+lemma pure_bind : lazy_list.bind (lazy_list.pure x) f = f x :=
+by simp only [lazy_list.pure,lazy_list.bind,append_nil]
+
+lemma bind_pure : lazy_list.bind x' pure = x' :=
+begin
+  induction x'; simp [lazy_list.bind,has_pure.pure,lazy_list.pure,append],
+  ext ⟨ ⟩, apply x'_ih
+end
+
+lemma bind_append {xs ys : lazy_list α} :
+  lazy_list.bind (xs.append ys) f = (xs.bind f).append (ys.bind f) :=
+by induction xs; simp only [*,append,lazy_list.bind,append_assoc]
+
+lemma bind_assoc : lazy_list.bind (lazy_list.bind x' f) g = lazy_list.bind x' (λ a, lazy_list.bind (f a) g) :=
+begin
+  induction x', refl,
+  dsimp at x'_ih,
+  simp only [lazy_list.bind,*],
+  rw [← x'_ih,bind_append],
+end
+
+instance : is_lawful_monad lazy_list :=
+{ pure_bind := λ α β, pure_bind,
+  bind_assoc := @bind_assoc,
+  id_map := by intros; apply bind_pure
+   }
+
+end lazy_list
+
+namespace lean.parser
+
+meta def returnex {α : Type} (e : exceptional α) : lean.parser α :=
+λ s, match e with
+| exceptional.success a      := result.success a s
+| exceptional.exception f := result.exception (some (λ u, f s.options)) none s
+end
+
+end lean.parser
+
+namespace psigma
+
+variables {α : Sort u} {β : α → Sort v} {γ : Sort w}
+
+def curry (f : psigma β → γ) : Π a (b : β a), γ :=
+λ x y, f ⟨x,y⟩
+
+def uncurry (f : Π a (b : β a), γ) : psigma β → γ
+| ⟨a,b⟩ := f a b
+
+end psigma

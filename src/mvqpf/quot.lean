@@ -1,4 +1,4 @@
-
+import mvqpf.fix
 import mvqpf.basic
 
 universes u
@@ -50,5 +50,35 @@ noncomputable def rel_quot : @mvqpf _ (quot1 R) (mvqpf.mvfunctor R Hfunc) :=
   (λ α β f x, quot.sound (Hfunc _ _ _ (Hrefl _)))
 
 end rel
+
+end mvqpf
+
+namespace mvqpf
+
+variables {n : ℕ}
+variables {F : typevec.{u} n.succ → Type u} [mvfunctor F] [mvqpf F]
+
+variables (R : ∀ ⦃α⦄, fix F α → fix F α → Prop)
+
+namespace quot
+
+variables {α : typevec.{u} n}
+
+noncomputable def mk (x : F (α ::: quot1 R α)) : quot1 R α :=
+quot.mk _ (fix.mk $ (typevec.id ::: quot.out) <$$> x)
+-- quot.mk _ (fix.mk $ (typevec.id ::: _) <$$> x)
+#check fix.rec
+
+def dest (x : quot1 R α) : F (α ::: quot1 R α) :=
+quot.lift_on x
+-- (λ x, (typevec.id ::: _root_.quot.mk _) <$$> _)
+(fix.rec $ λ x, (typevec.id ::: (mk R)) <$$> x)
+(by { refine mvqpf.fix.ind _ _, })
+
+
+def rec {β : Type u} (g : F (α ::: β) → β) : quot1 R α → β := _
+
+end quot
+
 
 end mvqpf
