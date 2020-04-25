@@ -129,7 +129,6 @@ meta def ctor_name {elab} : expr elab → string
 | (elet var_name type assignment body) := "elet"
 | (macro a a_1) := "macro"
 
--- #exit
 meta def map_head {elab} (f : expr elab → expr elab) : expr elab → expr elab
 | (pi n bi d b) := pi n bi d (map_head b)
 | e := f e
@@ -193,36 +192,6 @@ lemma mvqpf.cofix.ext_mk' {n : ℕ} {F : typevec (n + 1) → Type*} [_inst_1 : m
   (h : mvqpf.cofix.mk x = y) :
   x = mvqpf.cofix.dest y :=
 mvqpf.cofix.ext_mk _ _ ((mvqpf.cofix.mk_dest y).symm ▸ h)
--- #check mvqpf.cofix.ext_mk'
-
-.
-  -- (h : ∀ X Y (f : cofix F α → X) (f' : β → X) (k : X → Y) (x : β),
-  --        g (k ∘ f) (k ∘ f') x = (id ::: k) <$$> g f f' x) :
--- #check @mvfunctor.map
-meta def prove_functorial (eqns : list declaration) (univs : list name) (tn n : name) (vs args : list expr) (t' : expr) : tactic unit :=
-do trace "> functorial",
-   let u' := t'.get_app_fn.const_params,
-   shape_fn ← mk_mapp (n <.> "shape") (vs.map some) >>= trace_expr,
-   let shape_map := @const tt (tn <.> "shape" <.> "map") u',
-   trace_expr shape_map,
-   t ← infer_type shape_fn,
-   (sort u) ← pure t.binding_domain,
-   (state,arg) ← mk_sigma_val u args,
-   trace t',
-   X ← mk_local_def `X t.binding_domain,
-   Y ← mk_local_def `Y t.binding_domain >>= trace_expr,
-   f₀ ← mk_local_def `f₀ $ t'.imp X,
-   f₁ ← mk_local_def `f₁ $ state.imp X,
-   k ← mk_local_def `k $ X.imp Y,
-   x ← mk_local_def `x state,
-   comp ← mk_mapp ``function.comp [none,none,none,k,f₁],
-   lhs ← trace_expr (shape_fn Y comp x),
-   rhs ← trace_expr (shape_fn X f₁ x),
-   -- to_expr ``(@mvfunctor.map _ %%shape_intl _ _ _ _ %%rhs) >>= trace_expr,
-   trace "",
-   pure ()
-
-#check @typevec.id_eq_nil_fun
 
 -- todo: test nesting guarded call in if-then-else
 -- todo: use escape hatch (e.g. monad bind)
@@ -242,7 +211,6 @@ do shape_fn ← mk_mapp (n <.> "shape") (vs.map some),
           simp_arg_type.expr ``(typevec.id_eq_nil_fun),
           simp_arg_type.expr  ``(psigma.curry),
           simp_arg_type.expr ``(psigma.uncurry),
-          -- simp_arg_type.expr ``(mvfunctor.map),
           simp_arg_type.expr shape_def],
 
    mzip_with' (λ x (d : declaration), do
@@ -256,52 +224,30 @@ do shape_fn ← mk_mapp (n <.> "shape") (vs.map some),
      (_,pr) ← solve_aux prop $ do
      { delta_target [n,tn <.> "corec₁"],
        refine ``(mvqpf.cofix.ext _ _ _),
-       trace "> A",
        mk_const ``mvqpf.cofix.dest_corec₁ >>= rewrite_target,
-       trace "> A",
        dsimp_target s₀ [] { fail_if_unchanged := ff },
        mk_const x >>= rewrite_target,
-       -- trace_state,
-       trace "> A",
        `(%%a = mvqpf.cofix.dest %%b) ← target,
        e ← mk_mapp ``mvqpf.cofix.ext_mk' [none,none,none,none,none,a,b],
        apply e, reflexivity,
        intros,
        dsimp_target s₀ [] { fail_if_unchanged := ff },
-       trace_state,
        mk_const x >>= rewrite_target,
-       trace "> B",
-       -- s ← simp_lemmas.append simp_lemmas.mk [shape_def],
-
-       -- trace s,
        simp_target s [``mvfunctor.map],
-       trace_state,
-       trace "> C",
-
-       reflexivity
-       -- mk_const ``typevec.id_eq_nil_fun >>= rewrite_target,
-       -- simp_target s [],
-       -- refine ``(mvqpf.cofix.ext_mk _ %%a %%b),
-
-       -- trace_state, admit
- },
-       trace "> D",
+       reflexivity },
      pr ← instantiate_mvars pr >>= lambdas (vs ++ vs') >>= instantiate_mvars,
      prop ← instantiate_mvars prop >>= pis (vs ++ vs') >>= instantiate_mvars,
      let eqn_n := (d.to_name.replace_prefix (n <.> "shape'") n),
      add_decl $ declaration.thm eqn_n d'.univ_params prop (pure pr),
-       trace!"> E: {eqn_n}",
-     trace prop, trace d'.univ_params,
      add_eqn_lemmas eqn_n
      ) xs eqns,
    pure ()
--- #check @typevec.id_eq_nil_fun
+
 setup_tactic_parser
 
 meta def elab_codef (n : name) (vs : list pexpr) (t : pexpr)
   (bod : pexpr ⊕ list (list pexpr × pexpr)) : tactic unit :=
-do trace "> elab_shape",
-   vs' ← vs.mmap add_local,
+do vs' ← vs.mmap add_local,
    t' ← to_expr t,
    (args,t') ← mk_local_pis t',
 
@@ -310,13 +256,9 @@ do trace "> elab_shape",
    let cs := spec.ctors.map type_cnstr.name,
    let us := spec.u_names,
    eqns ← elab_shape tn cs n vs t bod,
-   trace "> elab_corec",
    elab_corec n vs' args t',
-   -- prove_functorial eqns us tn n vs' args t',
-   trace "> elab_eqns",
 
    elab_eqns eqns us tn n vs' args t',
-   -- equations
    pure ()
 
 -- use cases_on of data types in built-in equation compiler
@@ -330,12 +272,36 @@ do n ← ident,
    t ← texpr,
    parser.add_local $ local_const n n binder_info.default t,
    bod ← parser.parse_body,
-   elab_codef n vs t bod,
-   trace "codef"
-.
-set_option trace.algebra true
+   elab_codef n vs t bod
 
 end tactic
+
+-- codata str (α : Type)
+-- | nil : str
+-- | cons : α → str → str
+
+-- -- codef map'' {α β} (f : α → β) : str α → str β
+-- -- | str.nil := str.nil
+-- -- | (str.cons x xs) := str.cons (f x) (map'' xs)
+
+-- -- -- hole errors wrong place
+-- -- -- compile pattern matching on codata
+-- -- codef map {α β} (f : α → β) : str α → str β
+-- -- | s := str.cases_on s str.nil (λ x xs, str.cons (f x) (map xs))
+
+-- codef map' {α β} (f : α → β) : list α → str β
+-- | [] := str.nil
+-- | (x :: xs) := str.cons (f x) (map' xs)
+
+-- #print prefix map'
+
+-- -- | s := str.cases_on s str.nil (λ x xs, str.cons (f x) (map' xs))
+-- .
+-- -- weird behavior if `str.cons x $ enum_from x.succ`
+-- codef enum_from : ℕ → str ℕ
+-- | x := str.cons x (enum_from x.succ)
+
+-- #exit
 
 -- #exit
 
@@ -384,7 +350,7 @@ end tactic
 
 
 -- #exit
-set_option trace.simp_lemmas true
+-- set_option trace.simp_lemmas true
 codata part (α : Type)
 | pure : α → part
 | delay : part → part
@@ -397,42 +363,64 @@ codata part (α : Type)
 -- part.delay  (diverge'' x.succ (x :: xs) k)
 
 -- #print prefix   diverge''
-set_option trace.auto.finish true
-set_option trace.simp_lemmas.invalid true
-
+-- set_option trace.auto.finish true
+-- set_option trace.simp_lemmas.invalid true
 
 codef diverge' {α} : part α :=
 part.delay diverge'
 
-#print prefix part.corec₁
+-- #print prefix part.corec₁
 
-#print diverge'
+-- #print prefix diverge'
 
-def diverge {α} : part α :=
-part.corec _ unit (λ _, part.shape.delay ()) ()
+-- def diverge {α} : part α :=
+-- part.corec _ unit (λ _, part.shape.delay ()) ()
 
+-- run_cmd do
+-- t ← tactic.get_eqn_lemmas_for tt ff ``diverge',
+-- tactic.trace t,
+-- t ← tactic.interactive.get_rule_eqn_lemmas (tactic.interactive.rw_rule.mk ⟨0,0⟩ tt ``(diverge')),
+-- tactic.trace t,
+-- t ← tactic.interactive.get_rule_eqn_lemmas (tactic.interactive.rw_rule.mk ⟨0,0⟩ tt ``(diverge')),
+-- tactic.trace t
 
-#exit
+-- example {α} (x : part α) : x = diverge :=
+-- by rw diverge
+
+-- example {α} (x : part α) : x = diverge' :=
+-- by rw diverge'
+
+-- example {α} (x : part α) : x = diverge' :=
+-- by simp  [diverge']
+
+-- example {α} (x : part α) : x = diverge' :=
+-- by do
+-- { t ← tactic.get_eqn_lemmas_for tt ff ``diverge',
+--   t ← t.mmap tactic.mk_const,
+--   t.mmap tactic.infer_type >>= tactic.trace,
+--   tactic.trace_state,
+--   t.mmap' tactic.rewrite_target }
+
+-- #exit
 
 codata str (α : Type)
 | nil : str
 | cons : α → str → str
 
--- hole errors wrong place
--- compile pattern matching on codata
-codef map {α β} (f : α → β) : str α → str β
-| s := str.cases_on s str.nil (λ x xs, str.cons (f x) (map xs))
+-- -- hole errors wrong place
+-- -- compile pattern matching on codata
+-- codef map {α β} (f : α → β) : str α → str β
+-- | s := str.cases_on s str.nil (λ x xs, str.cons (f x) (map xs))
 
 codef map' {α β} (f : α → β) : list α → str β
 | [] := str.nil
 | (x :: xs) := str.cons (f x) (map' xs)
--- | s := str.cases_on s str.nil (λ x xs, str.cons (f x) (map' xs))
-.
+
 -- weird behavior if `str.cons x $ enum_from x.succ`
 codef enum_from : ℕ → str ℕ
 | x := str.cons x (enum_from x.succ)
 
-#exit
+-- #exit
 -- #check part.bisim_rel
 
 -- #check @mvqpf.cofix.bisim
@@ -457,12 +445,12 @@ section part
 
 -- generate me
 lemma part.shape.dest_pure {α} (x : α) :
-  mvqpf.cofix.dest (part.pure α x) = part.shape.pure x :=
+  mvqpf.cofix.dest (part.pure x) = part.shape.pure x :=
 mvqpf.cofix.dest_mk _
 
 -- generate me
 lemma part.shape.dest_delay {α} (x : part α) :
-  mvqpf.cofix.dest (part.delay α x) = part.shape.delay x :=
+  mvqpf.cofix.dest (part.delay x) = part.shape.delay x :=
 mvqpf.cofix.dest_mk _
 
 end part
@@ -472,13 +460,13 @@ variables {α : Type}
 variables (r : part α → part α → Prop)
 variables
   (hh₀₀ : ∀ (x y : α),
-    r (part.pure _ x) (part.pure _ y) → x = y)
+    r (part.pure x) (part.pure y) → x = y)
   (hh₀₁ : ∀ (x : α) (y : part α),
-    r (part.pure _ x) (part.delay _ y) → false)
+    r (part.pure x) (part.delay y) → false)
   (hh₁₀ : ∀ (x : part α) (y : α),
-    r (part.delay _ x) (part.pure _ y) → false)
+    r (part.delay x) (part.pure y) → false)
   (hh₁₁ : ∀ (x y : part α),
-    r (part.delay _ x) (part.delay _ y) → r x y)
+    r (part.delay x) (part.delay y) → r x y)
 
 include hh₀₀ hh₀₁ hh₁₀ hh₁₁
 
@@ -523,16 +511,16 @@ end bisim
 -- #check mvfunctor.map
 
 --| todo: generate this
-example {α} : @diverge α = part.delay _ diverge :=
-begin
-  apply mvqpf.cofix.ext,
-  rw [diverge,part.shape.dest_delay],
-  delta part.corec,
-  erw [mvqpf.cofix.dest_corec,← typevec.append_fun_id_id],
-  dsimp [mvfunctor.map],
-  convert part.shape.internal.map._equation_1 _ _ _,
-  ext i, cases i
-end
+-- example {α} : @diverge' α = part.delay diverge' :=
+-- begin
+--   apply mvqpf.cofix.ext,
+--   rw [diverge,part.shape.dest_delay],
+--   delta part.corec,
+--   erw [mvqpf.cofix.dest_corec,← typevec.append_fun_id_id],
+--   dsimp [mvfunctor.map],
+--   convert part.shape.internal.map._equation_1 _ _ _,
+--   ext i, cases i
+-- end
 
 -- #exit
 
@@ -554,9 +542,9 @@ end
 -- end
 -- #exit
 
-codata str (α : Type)
-| nil : str
-| cons : α → str → str
+-- codata str (α : Type)
+-- | nil : str
+-- | cons : α → str → str
 
 -- #check str.shape.liftr_def
 -- #check str.shape.liftr_iff
@@ -566,49 +554,49 @@ codata str (α : Type)
 -- #print prefix mvqpf.cofix
 -- #exit
 
-def map {α β} (f : α → β) (x : str α) : str β :=
-str.corec _ _
-(λ x, @str.cases_on _ (λ _, str.shape β (str α)) x
-  str.shape.nil
-  (λ (x : α) (y : str α), str.shape.cons (f x) y))
-x
+-- def map {α β} (f : α → β) (x : str α) : str β :=
+-- str.corec _ _
+-- (λ x, @str.cases_on _ (λ _, str.shape β (str α)) x
+--   str.shape.nil
+--   (λ (x : α) (y : str α), str.shape.cons (f x) y))
+-- x
 
--- todo: encapsulate data type in struct
-lemma map_eqn_1 {α β} (f : α → β) (x : α) (xs : str α) :
-  map f (str.cons _ x xs) = str.cons _ (f x) (map f xs) :=
-begin
-  dsimp [map],
-  apply mvqpf.cofix.ext,
-  erw [mvqpf.cofix.dest_corec,mvqpf.cofix.dest_mk],
-  dsimp, erw [str.cases_on_cons,← typevec.append_fun_id_id, typevec.eq_nil_fun typevec.id],
-  dsimp [(<$$>)],
-  erw [str.shape.internal.map._equation_1 id (mvqpf.cofix.corec _) _ _],
-  refl,
-end
+-- -- todo: encapsulate data type in struct
+-- lemma map_eqn_1 {α β} (f : α → β) (x : α) (xs : str α) :
+--   map f (str.cons _ x xs) = str.cons _ (f x) (map f xs) :=
+-- begin
+--   dsimp [map],
+--   apply mvqpf.cofix.ext,
+--   erw [mvqpf.cofix.dest_corec,mvqpf.cofix.dest_mk],
+--   dsimp, erw [str.cases_on_cons,← typevec.append_fun_id_id, typevec.eq_nil_fun typevec.id],
+--   dsimp [(<$$>)],
+--   erw [str.shape.internal.map._equation_1 id (mvqpf.cofix.corec _) _ _],
+--   refl,
+-- end
 
-lemma map_eqn_2 {α β} (f : α → β) (x : α) (xs : str α) :
-  mvqpf.cofix.dest (map f (str.cons _ x xs)) = str.shape.cons (f x) (map f xs) :=
-begin
-  rw [map], delta str.corec,
-  rw [mvqpf.cofix.dest_corec],
-  dsimp, rw str.cases_on_cons,
-  refl
-end
+-- lemma map_eqn_2 {α β} (f : α → β) (x : α) (xs : str α) :
+--   mvqpf.cofix.dest (map f (str.cons _ x xs)) = str.shape.cons (f x) (map f xs) :=
+-- begin
+--   rw [map], delta str.corec,
+--   rw [mvqpf.cofix.dest_corec],
+--   dsimp, rw str.cases_on_cons,
+--   refl
+-- end
 
-def enum_from : ℕ → str ℕ :=
-str.corec _ _ (λ x, str.shape.cons x x.succ)
+-- def enum_from : ℕ → str ℕ :=
+-- str.corec _ _ (λ x, str.shape.cons x x.succ)
 
 lemma enum_from_eqn_1 (i : ℕ) : mvqpf.cofix.dest (enum_from i) = str.shape.cons i (enum_from i.succ) :=
 begin
-  rw [enum_from], delta str.corec,
-  rw [mvqpf.cofix.dest_corec], refl
+  rw [enum_from], symmetry, delta str.cons,
+  rw [mvqpf.cofix.dest_mk], refl
 end
 
-lemma enum_from_eqn_2 (i : ℕ) : enum_from i = str.cons _ i (enum_from i.succ) :=
-begin
-  dsimp [enum_from], delta str.cons str.corec, apply mvqpf.cofix.ext,
-  rw [mvqpf.cofix.dest_corec,mvqpf.cofix.dest_mk], refl,
-end
+-- lemma enum_from_eqn_2 (i : ℕ) : enum_from i = str.cons i (enum_from i.succ) :=
+-- begin
+--   rw [enum_from], symmetry, delta str.cons,
+--   rw [mvqpf.cofix.dest_mk], refl
+-- end
 
 example {x y} : enum_from (x + y) = map (λ z, z + y) (enum_from x) :=
 begin

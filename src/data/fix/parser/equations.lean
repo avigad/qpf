@@ -86,6 +86,7 @@ do let params := d.params.map to_implicit_local_const,
         t ← pis ctor.args eqn >>= pis (C :: vs) >>= pis (params),
         let n := ((d.induct.name <.> "cases_on").bundle ctor.name),
         add_decl $ declaration.thm n (u :: d.induct.u_names) t df,
+        add_eqn_lemmas n,
         simp_attr.pseudo_eqn.set n () tt,
         skip }
 
