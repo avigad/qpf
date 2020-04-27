@@ -337,74 +337,12 @@ do let my_shape_intl_t := (@const tt (d.induct.name <.> "shape" <.> "internal") 
    r  ← mk_local_def `r (my_t.imp $ my_t.imp `(Prop)),
    r' ← mk_mapp ``typevec.rel_last [none,v',none,none,r],
    hr ← mk_local_def `a (r x y),
-   trace "\n\n\n• foo",
-   params ← mk_last_rel func.params',
-   -- trace params,
-   -- mk_const (func.induct.name ++ "liftr") >>= trace_expr,
-   -- trace_expr r', trace_expr x', trace_expr y',
-   -- trace_expr x, trace_expr y,
-   let R := (@const tt (func.induct.name ++ "liftr") func.univ_params).mk_app (params.bind decls') x y,
-   -- R ← mk_app (func.induct.name ++ "liftr") [r',x',y'],
-   R' ← mk_app ``mvfunctor.liftr [r',x',y'],
-   -- trace_expr R',
-   -- trace_expr R,
-   -- trace_expr hr,
-   -- (params.bind decls').mmap trace_expr,
-   trace "---> boop <---",
-   -- f  ← pis [x,y,hr] R >>= intro_local_def `ff,
-   f  ← pis [x,y,hr] R >>= mk_local_def `ff,
-   -- trace_state,
-   f' ← pis [r,f,x,y,hr] R' >>= mk_meta_var,
-   -- trace_expr f',
-
-   set_goals [f'],
-   -- mk_const (func.induct.name ++ "liftr_iff") >>= trace_expr ∘ flip id [params.bind decls',[x,y]] ∘ expr.mk_app',
-   solve1 $ do
-   { trace_state,
-     trace "---> before intro <---",
-     xs ← introv [],
-     hh ← intro `hh,
-     ys ← introv [],
-     hr ← intro `hr,
-     -- trace_expr f,
-     trace_state,
-     -- let f' := (hh.mk_app xs hh),
-     -- t ← infer_type f' >>= instantiate_mvars,
-     -- f ← note `f' none f',
-     h ← mk_const ``typevec.liftr_last_rel_iff,
-     -- trace_expr h,
-     rewrite_target h { symm := tt },
-     `[simp only [typevec.rel_last'] with typevec],
-     let rule := (@const tt (func.induct.name ++ "liftr_iff") func.univ_params).mk_app' [params.bind decls',[x,y]],
-     trace "---> we see this line <---",
-     trace_state,
-     -- trace params,
-     trace "---> we see this line too <---",
-     x ← mk_mapp ``iff.mpr [none,none,rule],
-     trace "> rule",
-     trace_expr rule,
-     trace "---> arrow <---",
-     trace_expr f,
-     x ← trace_expr (x r),
-     v ← mk_mvar,
-     trace "---> we see this line too 2 <---",
-     refine ``(eq.mpr %%v %%x),
-     -- congr,
-     -- trace "> r",
-     -- trace_expr r,
-     trace_state,
-     trace "---> not that one <---",
-     done,
-     rewrite_hyp rule f { symm := tt },
-     -- trace_state,
-     -- mk_const (func.induct.name ++ "liftr_iff") >>= rewrite_target,
-     trace_state },
-   df ← mk_mapp ``mvqpf.cofix.bisim [none,my_shape_intl_t,none,none,v',r,f'] -- ,f,x,y,hr
-      -- >>= lambdas' [d.params, [r,f,x,y,hr]],
-   ,
-   trace_expr df,
-   (fail "• here •" : tactic unit),
-   t  ← mk_app `eq [x,y] >>= pis' [d.params, [r,x,y,hr]],
+   R ← mk_app ``mvfunctor.liftr [r',x',y'],
+   f ← pis [x,y,hr] R >>= mk_local_def `f,
+   trace_expr f,
+   df ← mk_mapp ``mvqpf.cofix.bisim [none,my_shape_intl_t,none,none,v',r,f,x,y,hr]
+      >>= lambdas (d.params ++ [r,f,x,y,hr]),
+   t  ← mk_app `eq [x,y] >>= pis (d.params ++ [r,f,x,y,hr]),
    f ← add_decl' $ declaration.thm (d.induct.name <.> "bisim") d.induct.u_names t (pure df),
    -- let r := (@const tt (d.induct.name <.> "bisim_rel") d.induct.u_params).mk_app d.params,
    -- let e := f.mk_app d.params r,
@@ -545,11 +483,7 @@ do d ← inductive_decl.parse meta_info,
 -- expr.sort <$> mk_meta_univ >>= mk_meta_var
 
 end tactic
+codata tree' (α β : Type)
+| nil : tree'
+| cons : α → (β → tree') → tree'
 
-namespace foo
-
-codata part (α : Type)
-| pure : α → part
-| delay : part → part
-
-end foo

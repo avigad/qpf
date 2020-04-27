@@ -1418,9 +1418,3 @@ meta def qpf_attribute : user_attribute :=
 end tactic
 open function typevec typevec.prod
 
-@[qpf]
-inductive tree' (α β γ : Type)
-| cons : β → α → (β → α) → tree'
-| nil : γ → tree'
--- todo: nesting
--- #print prefix tree'

@@ -7,7 +7,7 @@ Basic machinery for defining general coinductive types
 
 Work in progress
 -/
-import data.pfun tactic.interactive ..for_mathlib .basic
+import data.pfun tactic.interactive for_mathlib .basic
        meta.coinductive_predicates
 universes u v w
 

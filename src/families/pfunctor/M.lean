@@ -8,8 +8,7 @@ Basic machinery for defining general coinductive types
 Work in progress
 -/
 import data.pfun tactic.interactive for_mathlib .basic
-  tactic.wlog
-
+  tactic.wlog meta.coinductive_predicates
 universes u v w
 
 open nat function list (hiding head')
@@ -26,9 +25,9 @@ inductive cofix_a : ℕ → I → Type u
 | intro {n} {i} : ∀ a, (F.B i a ⟶ cofix_a n) → cofix_a (succ n) i
 
 -- #exit
-@[extensionality]
+@[ext]
 lemma cofix_a_eq_zero : ∀ {i} (x y : cofix_a F 0 i), x = y
-| i (cofix_a.continue _) (cofix_a.continue _) := rfl
+| i cofix_a.continue cofix_a.continue := rfl
 
 variables {F}
 
@@ -68,7 +67,7 @@ end
 
 def truncate
 : ∀ {n : ℕ}, cofix_a F (n+1) ⟶ cofix_a F n
- | 0 _ (cofix_a.intro _ _) := cofix_a.continue _
+ | 0 _ (cofix_a.intro _ _) := cofix_a.continue
  | (succ n) _ (cofix_a.intro i f) := cofix_a.intro i $ f ≫ truncate
 
 lemma truncate_eq_of_agree {i} {n : ℕ}
@@ -90,7 +89,7 @@ variables {X : fam I}
 variables (f : X ⟶ F.obj X)
 
 def s_corec : Π n, X ⟶ cofix_a F n
- | 0 _ _ := cofix_a.continue _
+ | 0 _ _ := cofix_a.continue
  | (succ n) _ j :=
    let ⟨y,g⟩ := f j in
    cofix_a.intro y $ g ≫ s_corec _
@@ -213,7 +212,7 @@ def from_cofix : M F ⟶ F.obj (M F) :=
 namespace approx
 
 protected def s_mk {i} (x : F.obj (M F) i) : Π n, cofix_a F n i
- | 0 :=  cofix_a.continue _
+ | 0 :=  cofix_a.continue
  | (succ n) := cofix_a.intro x.1 (λ i j, (x.2 j).approx n)
 
 protected def P_mk {i} (x : F.obj (M F) i)

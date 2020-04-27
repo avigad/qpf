@@ -47,12 +47,12 @@ variables {F G} {α β : fam J} (f : α ⟶ β)
 include q q'
 
 local attribute [simp] category_theory.functor.map_comp_map category_theory.functor.map_comp_map_assoc
-local attribute [-simp] functor.map_comp functor.map_comp_assoc
+local attribute [-simp] functor.map_comp
 
 instance : mvqpf (F ⋙ G) :=
 { P         := pfunctor.comp (P G) (P F),
-  abs       := λ α, pfunctor.comp.get _ _ α ≫ (P G).map (abs F _) ≫ abs G _ ≫ 𝟙 (G.obj (F.obj α)),
-  repr      := λ α, 𝟙 (G.obj (F.obj α)) ≫ @repr _ _ G q' _ ≫ (P G).map (repr F α) ≫ pfunctor.comp.mk _ _ _,
+  abs       := λ α, pfunctor.comp.get _ _ α ≫ (P G).map (abs _) ≫ abs _ ≫ 𝟙 (G.obj (F.obj α)),
+  repr      := λ α, 𝟙 (G.obj (F.obj α)) ≫ @repr _ _ G q' _ ≫ (P G).map (repr α) ≫ pfunctor.comp.mk _ _ _,
   abs_repr := by { intros, simp [category_theory.category.id_comp], erw category_theory.category.id_comp, refl },
   abs_map  := by { intros, simp [abs_map], } }
 

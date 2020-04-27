@@ -134,7 +134,7 @@ lemma prod_mk_get {X : fam (I ⊕ I')} :
   prod_mk F G X ≫ prod_get F G X = 𝟙 _ :=
 by { ext1 ⟨ ⟩, ext ⟨_,_ ⟩; intros, refl, cases a, simp, ext _ ⟨ ⟩, dsimp [prod_get,prod_mk,mvfunctor.prod.map.fst,mvfunctor.prod.map'], ext, refl,
      ext ⟨ ⟩, refl, rintros ⟨ ⟩, dsimp [prod_get,prod_mk,mvfunctor.prod.map.fst,mvfunctor.prod.map'], ext, refl, rintros _ _ ⟨ ⟩,
-     simp, dsimp [prod_get,prod_mk,mvfunctor.prod.map.fst,mvfunctor.prod.map'], ext, refl }
+     simp [prod_get,prod_mk,mvfunctor.prod.map.fst,mvfunctor.prod.map'], ext, refl }
 
 @[simp,reassoc]
 lemma prod_get_mk {X : fam (I ⊕ I')} :
@@ -166,7 +166,7 @@ variables {I I' J J' : Type u}
   (F : fam I  ⥤ fam J ) [q  : mvqpf F]
   (G : fam I' ⥤ fam J') [q' : mvqpf G]
 
-attribute [extensionality fam] funext
+attribute [ext fam] funext
 
 open category_theory
 
@@ -178,14 +178,14 @@ variables {F G} {α β : fam J} (f : α ⟶ β)
 include q q'
 
 local attribute [simp] category_theory.functor.map_comp_map category_theory.functor.map_comp_map_assoc
-local attribute [-simp] functor.map_comp functor.map_comp_assoc
+local attribute [-simp] functor.map_comp
 
 open mvfunctor.prod (fst snd)
 
 instance : mvqpf (prod F G) :=
 { P         := pfunctor.prod (P F) (P G),
-  abs       := λ α, pfunctor.prod_get _ _ _ ≫ prod_map (abs _ (fst α)) (abs _ (snd α)) ≫ prod_mk F G _,
-  repr      := λ α, prod_get _ _ _ ≫ prod_map (repr _ _) (repr _ _) ≫ pfunctor.prod_mk _ _ _,
+  abs       := λ α, pfunctor.prod_get _ _ _ ≫ prod_map (abs (fst α)) (abs (snd α)) ≫ prod_mk F G _,
+  repr      := λ α, prod_get _ _ _ ≫ prod_map (repr _) (repr _) ≫ pfunctor.prod_mk _ _ _,
   abs_repr  := by { intros, simp, },
   abs_map   := by { intros, simp, },
  }

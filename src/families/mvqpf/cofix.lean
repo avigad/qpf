@@ -16,17 +16,17 @@ variables {I J : Type u} {F : fam (I⊕J) ⥤ fam J} [q : mvqpf F]
 include q
 
 def corecF {α : fam I} {β : fam J} (g : β ⟶ F.obj (α.append1 β)) : β ⟶ q.P.M α :=
-q.P.M_corec (g ≫ repr _ _)
+q.P.M_corec (g ≫ repr _)
 
 @[reassoc]
 theorem corecF_eq {α : fam I} {β : fam J} (g : β ⟶ F.obj (α.append1 β)) :
-  corecF g ≫ q.P.M_dest = g ≫ repr _ _ ≫ q.P.map (append_fun (𝟙 _) (corecF g)) :=
+  corecF g ≫ q.P.M_dest = g ≫ repr _ ≫ q.P.map (append_fun (𝟙 _) (corecF g)) :=
 by rw [corecF, q.P.M_dest_corec'', category.assoc]
 
 def is_precongr {α : fam I} (r : fam.Pred (q.P.M α ⊗ q.P.M α)) : Prop :=
   ∀ ⦃i⦄ ⦃x : unit i ⟶ q.P.M α ⊗ q.P.M α⦄, x ⊨ r →
-    x ≫ fam.prod.fst ≫ q.P.M_dest ≫ q.P.map (append_fun (𝟙 _) (fam.quot.mk r)) ≫ abs _ _ =
-    x ≫ fam.prod.snd ≫ q.P.M_dest ≫ q.P.map (append_fun (𝟙 _) (fam.quot.mk r)) ≫ abs _ _
+    x ≫ fam.prod.fst ≫ q.P.M_dest ≫ q.P.map (append_fun (𝟙 _) (fam.quot.mk r)) ≫ abs _ =
+    x ≫ fam.prod.snd ≫ q.P.M_dest ≫ q.P.map (append_fun (𝟙 _) (fam.quot.mk r)) ≫ abs _
 
 section
 variables F
@@ -140,14 +140,14 @@ fam.quot.lift _ (q.P.Mp.map g ≫ fam.quot.mk (Mcongr F β))
       { existsi k, refl, },
       clear_except hh' hu h,
       specialize h hh', reassoc! h,
-      rw [← functor.map_comp,← append_fun_comp,hu,category.comp_id,← category.id_comp _ g,append_fun_comp,functor.map_comp,← abs_map_assoc,h] },
+      rw [← functor.map_comp,← append_fun_comp,hu,category.comp_id,← category.id_comp g,append_fun_comp,functor.map_comp,← abs_map_assoc,h] },
   end
 
 def cofix.corec {α : fam I} {β : fam J} (g : β ⟶ F.obj (α.append1 β)) : β ⟶ cofix F α :=
 corecF g ≫ fam.quot.mk _
 
 def cofix.dest {α : fam I} : cofix F α ⟶ F.obj (α.append1 (cofix F α)) :=
-fam.quot.lift _ (q.P.M_dest ≫ abs F _ ≫ F.map (append_fun (𝟙 _) (fam.quot.mk _)))
+fam.quot.lift _ (q.P.M_dest ≫ abs _ ≫ F.map (append_fun (𝟙 _) (fam.quot.mk _)))
 begin
   rintros i a h,
   obtain ⟨r,hr,hr'⟩ := Mcongr_elim _ h,
@@ -509,8 +509,8 @@ open function
 
 theorem cofix.bisim' {α : fam I} {β : fam J} (Q : Pred β) (u v : β ⟶ cofix F α) {i}
     (h : ∀ {i} (x : unit i ⟶ β), x ⊨ Q → ∃ a f' f₀ f₁,
-      x ≫ u ≫ cofix.dest = value i (q.P.obj _) ⟨a, q.P.append_contents f' f₀⟩ ≫ abs F _ ∧
-      x ≫ v ≫ cofix.dest = value i (q.P.obj _) ⟨a, q.P.append_contents f' f₁⟩ ≫ abs F _ ∧
+      x ≫ u ≫ cofix.dest = value i (q.P.obj _) ⟨a, q.P.append_contents f' f₀⟩ ≫ abs _ ∧
+      x ≫ v ≫ cofix.dest = value i (q.P.obj _) ⟨a, q.P.append_contents f' f₁⟩ ≫ abs _ ∧
       ∀ j y, ∃ x' : unit j ⟶ β, x' ⊨ Q ∧ y ≫ f₀ = x' ≫ u ∧ y ≫ f₁ = x' ≫ v) :
   ∀ x : unit i ⟶ _, x ⊨ Q → x ≫ u = x ≫ v :=
 λ x Qx,

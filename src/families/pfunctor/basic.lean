@@ -45,9 +45,6 @@ theorem of_mem_supp {α : fam I} {X : fam J} {x : X ⟶ F.obj α} {p : fam.Pred 
 
 open category_theory
 
-attribute [reassoc] nat_trans.app_naturality nat_trans.naturality
-open category_theory
-
 lemma liftp_comp {α : fam I} {X : fam J} {p : Π i, α i → Prop}
   (x : X ⟶ F.obj α) (h : F ⟶ G) :
   liftp p x → liftp p (x ≫ h.app _)

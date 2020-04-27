@@ -18,15 +18,15 @@ include q
 /-- does recursion on `q.P.W` using `g : F α → α` rather than `g : P α → α` -/
 def recF (g : F.obj (α.append1 β) ⟶ β) : q.P.W α ⟶ β :=
 q.P.W_ind (λ j a f' f rec,
-  g (abs F _ ⟨a,fam.split_fun f' rec⟩))
+  g (abs _ ⟨a,fam.split_fun f' rec⟩))
 
 theorem recF_eq (g : F.obj (α.append1 β) ⟶ β)
     {i} (a : q.P.A i) (f' : q.P.drop.B i a ⟶ α) (f : q.P.last.B i a ⟶ q.P.W α) :
-  recF g (q.P.W_mk a f' f) =  g (abs F _ ⟨a, fam.split_fun f' (f ≫ recF g)⟩) :=
+  recF g (q.P.W_mk a f' f) =  g (abs _ ⟨a, fam.split_fun f' (f ≫ recF g)⟩) :=
 by simp [recF]; rw [mvpfunctor.W_ind_eq]; refl
 
 theorem recF_eq' (g : F.obj (α.append1 β) ⟶ β) :
-  recF g = q.P.W_dest' ≫ q.P.map (fam.append_fun (𝟙 _) (recF g)) ≫ abs F _ ≫ g :=
+  recF g = q.P.W_dest' ≫ q.P.map (fam.append_fun (𝟙 _) (recF g)) ≫ abs _ ≫ g :=
 begin
   ext i x : 2,
   apply q.P.W_cases _ _ x,
@@ -40,7 +40,7 @@ inductive Wequiv : Π {i}, q.P.W α i → q.P.W α i → Prop
     (∀ j (x : q.P.last.B i a j), Wequiv ((f₀ : Π j, q.P.last.B i a j → q.P.W α j) x) (f₁ x)) → Wequiv (q.P.W_mk a f' f₀) (q.P.W_mk a f' f₁)
 | abs {i} (a₀ : q.P.A i) (f'₀ : q.P.drop.B i a₀ ⟶ α) (f₀ : q.P.last.B i a₀ ⟶ q.P.W α)
           (a₁ : q.P.A i) (f'₁ : q.P.drop.B i a₁ ⟶ α) (f₁ : q.P.last.B i a₁ ⟶ q.P.W α) :
-      abs F _ ⟨a₀, q.P.append_contents f'₀ f₀⟩ = abs F _ ⟨a₁, q.P.append_contents f'₁ f₁⟩ →
+      abs _ ⟨a₀, q.P.append_contents f'₀ f₀⟩ = abs _ ⟨a₁, q.P.append_contents f'₁ f₁⟩ →
         Wequiv (q.P.W_mk a₀ f'₀ f₀) (q.P.W_mk a₁ f'₁ f₁)
 | trans {i} (u v w : q.P.W α i) : Wequiv u v → Wequiv v w → Wequiv u w
 
@@ -65,7 +65,7 @@ begin
 end
 
 theorem Wequiv.abs' ⦃i⦄ (x y : q.P.W α i)
-    (h : abs F _ (q.P.W_dest' x) = abs F _ (q.P.W_dest' y)) :
+    (h : abs _ (q.P.W_dest' x) = abs _ (q.P.W_dest' y)) :
   Wequiv x y :=
 begin
   revert i x h, refine q.P.W_cases _,
@@ -90,20 +90,20 @@ begin
 end
 
 /-- maps every element of the W type to a canonical representative -/
-def Wrepr : q.P.W α ⟶ q.P.W α := recF (repr _ _ ≫ q.P.W_mk')
+def Wrepr : q.P.W α ⟶ q.P.W α := recF (repr _ ≫ q.P.W_mk')
 
 -- set_option pp.implicit true
 
 theorem Wrepr_W_mk  ⦃i⦄
     (a : q.P.A i) (f' : q.P.drop.B i a ⟶ α) (f : q.P.last.B i a ⟶ q.P.W α) :
   Wrepr (q.P.W_mk a f' f) =
-    q.P.W_mk' (repr F _ (abs F _ (q.P.map (fam.append_fun (𝟙 _) Wrepr) ⟨a, q.P.append_contents f' f⟩))) :=
+    q.P.W_mk' (repr _ (abs _ (q.P.map (fam.append_fun (𝟙 _) Wrepr) ⟨a, q.P.append_contents f' f⟩))) :=
 by simp [Wrepr, recF_eq, pfunctor.map_eq,split_fun_comp_right]; refl
 
 theorem Wrepr_W_mk'  ⦃i⦄
     (a : q.P.A i) (f' : q.P.drop.B i a ⟶ α) (f : q.P.last.B i a ⟶ q.P.W α) :
   q.P.W_mk' ≫ Wrepr =
-     q.P.map (fam.append_fun (𝟙 _) Wrepr) ≫ abs F _ ≫ repr F (α.append1 _) ≫ q.P.W_mk' :=
+     q.P.map (fam.append_fun (𝟙 _) Wrepr) ≫ abs _ ≫ repr (α.append1 _) ≫ q.P.W_mk' :=
 by { ext1, ext1 ⟨a,f⟩, simp [mvpfunctor.W_mk',Wrepr_W_mk,abs_map'], congr,
      ext1 ⟨ ⟩; ext1; refl }
 
@@ -171,7 +171,7 @@ def fix.rec (g : F.obj (α.append1 β) ⟶ β) : fix F α ⟶ β :=
 fix.lift (recF g) (recF_eq_of_Wequiv α g)
 
 def fix_to_W : fix F α ⟶ q.P.W α :=
-fix.lift Wrepr (recF_eq_of_Wequiv α (λ i x, q.P.W_mk' (repr _ _ x)))
+fix.lift Wrepr (recF_eq_of_Wequiv α (λ i x, q.P.W_mk' (repr _ x)))
 
 def fix.quot.mk : q.P.W α ⟶ fix F α :=
 λ i x, quot.mk _ x
@@ -195,7 +195,7 @@ by { ext, dsimp [fix.lift,(≫)], induction x_1 using quot.ind, refl }
 --   fix.lift f @h = fix.lift g @h' := _
 
 def fix.mk : F.obj (α.append1 (fix F α)) ⟶ fix F α :=
-repr _ _ ≫ q.P.map (fam.append_fun (𝟙 _) fix_to_W) ≫ q.P.W_mk' ≫ fix.quot.mk
+repr _ ≫ q.P.map (fam.append_fun (𝟙 _) fix_to_W) ≫ q.P.W_mk' ≫ fix.quot.mk
 
 def fix.dest : fix F α ⟶ F.obj (α.append1 (fix F α)) :=
 fix.rec (F.map $ fam.append_fun (𝟙 _) fix.mk)
@@ -224,8 +224,8 @@ begin
 end
 
 theorem fix.ind_aux {i} (a : q.P.A i) (f' : q.P.drop.B _ a ⟶ α) (f : q.P.last.B i a ⟶ q.P.W α) :
-  fix.mk (abs F _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦q.P.W_mk a f' f⟧ :=
-have fix.mk (abs F _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦Wrepr (q.P.W_mk a f' f)⟧,
+  fix.mk (abs _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦q.P.W_mk a f' f⟧ :=
+have fix.mk (abs _ ⟨a, q.P.append_contents f' (λ i x, ⟦f x⟧)⟩) = ⟦Wrepr (q.P.W_mk a f' f)⟧,
   begin
     apply quot.sound, apply Wequiv.abs',
     rw [mvpfunctor.W_dest'_W_mk'', abs_map', abs_repr', ←abs_map', pfunctor.map_eq'],
@@ -248,9 +248,7 @@ begin
   show g₁ ⟦q.P.W_mk a f' f⟧ = g₂ ⟦q.P.W_mk a f' f⟧,
   rw [←fix.ind_aux a f' f],
   -- specialize h _,
-  -- specialize h (value _ ((P F).obj (append1 α (fix F α))) ⟨a,mvpfunctor.append_contents _ f' (λ i x, ⟦f x⟧)⟩ ≫ abs F _) _,
-  specialize h (value _ ((P F).obj (append1 α (fix F α))) ⟨a,mvpfunctor.append_contents _ f' (λ i x, ⟦f x⟧)⟩ ≫ abs F _) _,
-  -- { replace h := congr_fun (congr_fun h _) (abs F _ ⟨a,mvpfunctor.append_contents _ f' (λ i x, ⟦f x⟧)⟩),
+  specialize h (value _ ((P F).obj (append1 α (fix F α))) ⟨a,mvpfunctor.append_contents _ f' (λ i x, ⟦f x⟧)⟩ ≫ abs _) _,
   --   simp at h, exact h },
   -- { ext, cases x_2, },
   { replace h := congr_fun (congr_fun h j) unit.rfl, simp [value] at h, exact h },
@@ -294,7 +292,7 @@ begin
   intros i a f' f ih,
   change p _ ⟦q.P.W_mk a f' f⟧,
   rw [←fix.ind_aux a f' f],
-  apply h i (value _ _ (abs F (append1 α (fix F α))
+  apply h i (value _ _ (abs (append1 α (fix F α))
           ⟨a,
            mvpfunctor.append_contents (P F) f' (λ (i_1 : J) (x : (mvpfunctor.last (P F)).B i a i_1), ⟦f x⟧)⟩))
           _ unit.rfl,
