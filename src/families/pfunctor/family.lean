@@ -51,6 +51,10 @@ namespace fam
 
 variables {I J : Type u}
 
+-- @[ext]
+lemma ext (X Y : fam I) (f g : X ⟶ Y) (h : ∀ i (x : X i), f x = g x) : f = g :=
+funext $ λ i, funext $ h _
+
 def split_fun {α β : fam (I⊕J)} :
   Π (f : drop α ⟶ drop β) (g : last α ⟶ last β), α ⟶ β
 | f g (sum.inl i) x := f x

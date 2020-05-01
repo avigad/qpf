@@ -22,7 +22,7 @@ The main goal is to construct:
 We also show that the composition of qpfs is a qpf, and that the quotient of a qpf
 is a qpf.
 -/
-import tactic.interactive data.multiset pfunctor
+import tactic.interactive data.multiset pfunctor tactic.basic tactic.apply
 universe u
 
 /-
@@ -568,13 +568,13 @@ end
 
 variable (q)
 
-def is_uniform : Prop := ∀ ⦃α : Type u⦄ (a a' : q.P.A) 
+def is_uniform : Prop := ∀ ⦃α : Type u⦄ (a a' : q.P.A)
     (f : q.P.B a → α) (f' : q.P.B a' → α),
   abs ⟨a, f⟩ = abs ⟨a', f'⟩ → f '' univ = f' '' univ
 
 variable [q]
 
-theorem supp_eq_of_is_uniform (h : q.is_uniform) {α : Type u} (a : q.P.A) (f : q.P.B a → α) : 
+theorem supp_eq_of_is_uniform (h : q.is_uniform) {α : Type u} (a : q.P.A) (f : q.P.B a → α) :
   supp (abs ⟨a, f⟩) = f '' univ :=
 begin
   ext u, rw [mem_supp], split,
@@ -594,7 +594,7 @@ begin
   intro h',
   refine ⟨a, f, rfl, λ i, h' _ _⟩,
   rw supp_eq_of_is_uniform h,
-  exact ⟨i, mem_univ i, rfl⟩ 
+  exact ⟨i, mem_univ i, rfl⟩
 end
 
 theorem supp_map (h : q.is_uniform) {α β : Type u} (g : α → β) (x : F α) :
@@ -603,5 +603,189 @@ begin
   rw ←abs_repr x, cases repr x with a f, rw [←abs_map, pfunctor.map_eq],
   rw [supp_eq_of_is_uniform h, supp_eq_of_is_uniform h, image_comp]
 end
-  
+
+variables (F)
+def box {α} (A : set α) : set (F α) :=
+{ x | ∀ β (f g : α → β), (∀ a ∈ A, f a = g a) → f <$> x = g <$> x }
+
+lemma box_empty {α} : box F (∅ : set α) = ∅ :=
+begin
+  ext, simp [box],
+end
+
+lemma box_inter {α} (A B : set α) : box F (A ∩ B) = box F A ∩ box F B :=
+begin
+  ext, dsimp [box], simp only [← forall_and_distrib],
+  split; intros h,
+  { intros β f g, split,
+    { intro h', apply h, intros,
+      apply h' _ H.1 },
+    { intro h', apply h, intros,
+      apply h' _ H.2 } },
+  { introv h', specialize h _ f g,
+    cases h with h₀ h₁, apply h₀, },
+  repeat { apply forall_congr, intro, },
+  split; intros h; [split, skip]; intros h',
+  { apply h, introv h₁, apply h' _ h₁.1 },
+  { apply h, introv h₁, apply h' _ h₁.2 },
+  { apply h.1, },
+  apply' forall_congr, intro,
+end
+
+variables {F}
+
+def supp' {α} (x : F α) : set α :=
+⋂ A ∈ { A : set α | x ∈ box F A}, A
+
+def liftp' {α} (x : F α) (p : α → Prop) : Prop :=
+∀ a ∈ supp' x, p a
+
+def supp_eq_iff {α} (x : F α) (s : set α) : qpf.supp' x = s ↔  :=
+
 end qpf
+
+namespace ex
+
+def prod.pfunctor (α : Type) : pfunctor :=
+⟨ α, λ _, unit ⟩
+
+instance {α} : qpf (prod α) :=
+{ P := prod.pfunctor α,
+  abs := λ β ⟨a,f⟩, (a, f ()),
+  repr := λ β ⟨x,y⟩, ⟨x, λ _, y⟩,
+  abs_repr := λ β ⟨x,y⟩, rfl,
+  abs_map := λ β γ f ⟨a,g⟩, rfl }
+
+def foo.R (α : Type) (x y : bool × α) : Prop :=
+x.1 = y.1 ∧ (x.1 → x.2 = y.2)
+
+lemma equivalence_foo.R (α) : equivalence (foo.R α) :=
+begin
+  refine ⟨_,_,_⟩,
+  { intro, exact ⟨rfl,λ _, rfl⟩ },
+  { intros x y h, refine ⟨h.1.symm, λ _, (h.2 _).symm⟩,
+    rwa h.1 },
+  { rintros x y z ⟨ha,ha'⟩ ⟨hb,hb'⟩,
+    refine ⟨ha.trans hb, λ hh, _⟩,
+    refine (ha' hh).trans (hb' _),
+    rwa ← ha }
+end
+
+def foo (α : Type) :=
+quot $ foo.R α
+
+def foo.map {α β} (f : α → β) (x : foo α) : foo β :=
+quot.lift_on x (λ x : bool × α, quot.mk (foo.R β) $ f <$> x)
+  (λ ⟨a₀,a₁⟩ ⟨b₀,b₁⟩ h, quot.sound ⟨h.1,λ h', show f a₁ = f b₁, from congr_arg f (h.2 h')⟩)
+
+instance : functor foo :=
+{ map := @foo.map }
+
+@[simp]
+lemma foo.map_mk {α β : Type} (f : α → β) (x : bool × α) :
+  (f <$> quot.mk _ x : foo β) = quot.mk _ (f <$> x) :=
+by simp [(<$>),foo.map]
+
+noncomputable instance qpf.foo : qpf foo :=
+@qpf.quotient_qpf (prod bool) _ ex.qpf foo _ (λ α, quot.mk _) (λ α, quot.out)
+  (by simp)
+  (by intros; simp)
+
+def foo.mk {α} (b : bool) (x : α) : foo α := quot.mk _ (b, x)
+
+@[simp]
+lemma foo.map_mk' {α β : Type} (f : α → β) (b : bool) (x : α) :
+  f <$> foo.mk b x = foo.mk b (f x) :=
+by simp only [foo.mk, foo.map_mk]; refl
+
+@[simp]
+lemma foo.map_tt {α : Type} (x y : α) :
+  foo.mk tt x = foo.mk tt y ↔ x = y :=
+by simp [foo.mk]; split; intro h; [replace h := quot.exact _ h, rw h];
+   rw relation.eqv_gen_iff_of_equivalence at h;
+   [exact h.2 rfl, apply equivalence_foo.R]
+
+def supp_mk_ff₀ {α} (x y : α) (h : ¬ x = y) : functor.supp (foo.mk ff x) = {} :=
+begin
+  dsimp [functor.supp], ext z, simp, -- split; intro h,
+  classical, by_cases x = z,
+  { use (λ a, ¬ z = a), subst z,
+    dsimp [functor.liftp],
+    simp, refine ⟨foo.mk ff ⟨y,h⟩,_⟩,
+    simp, apply quot.sound, simp [foo.R] },
+  { use (λ a, x = a),
+    dsimp [functor.liftp],
+    simp [h], use foo.mk ff ⟨x,rfl⟩,
+    simp }
+end
+
+def supp_mk_ff₁ {α} (x : α) (h : ∀ z, x = z) : functor.supp (foo.mk ff x) = {x} :=
+begin
+  dsimp [functor.supp], ext y, simp, split; intro h',
+  { apply @h' (= x), dsimp [functor.liftp],
+    use foo.mk ff ⟨x,rfl⟩, refl },
+  { introv hp, simp [functor.liftp] at hp,
+    rcases hp with ⟨⟨z,z',hz⟩,hp⟩,
+    simp at hp, convert hz,
+    rw [h'], apply h },
+end
+
+def supp_mk_tt {α} (x : α) : functor.supp (foo.mk tt x) = {x} :=
+begin
+  dsimp [functor.supp], ext y, simp, split; intro h',
+  { apply @h' (= x), dsimp [functor.liftp],
+    use foo.mk tt ⟨x,rfl⟩, refl },
+  { introv hp, simp [functor.liftp] at hp,
+    rcases hp with ⟨⟨z,z',hz⟩,hp⟩,
+    simp at hp, replace hp := quot.exact _ hp,
+    rw relation.eqv_gen_iff_of_equivalence (equivalence_foo.R _) at hp,
+    rcases hp with ⟨⟨⟩,hp⟩, subst y,
+    replace hp := hp rfl, cases hp,
+    exact hz }
+end
+
+-- def supp_eq_iff {α} (x : α) : qpf.supp' (foo.mk ff x) = {} :=
+-- _
+
+def supp_mk_ff' {α} (x : α) : qpf.supp' (foo.mk ff x) = {} :=
+begin
+  dsimp [qpf.supp'], ext, simp, dsimp [qpf.box],
+  use ∅, simp [foo.mk], intros, apply quot.sound,
+  dsimp [foo.R], split, refl, rintro ⟨ ⟩
+end
+
+def supp_mk_ff' {α} (x : α) : qpf.supp' (foo.mk ff x) = {x} :=
+begin
+  dsimp [qpf.supp'], ext y, simp, dsimp [qpf.box],
+  split; intro h,
+  { specialize h {x} _, simp at h,
+    exact h, introv h', simp,
+    apply quot.sound, split, refl,
+    intro h, cases h },
+  { introv h₀, classical, subst y,
+    let f : α → α ⊕ bool := λ x, if x ∈ i then sum.inl x else sum.inr tt,
+    let g : α → α ⊕ bool := λ x, if x ∈ i then sum.inl x else sum.inr ff,
+    specialize h₀ _ f g _,
+    { simp [f,g] at h₀, split_ifs at h₀,
+      assumption, replace h₀ := quot.exact _ h₀,
+      rw relation.eqv_gen_iff_of_equivalence (equivalence_foo.R _) at h₀,
+      cases h₀ with h₀ h₁,  },
+    { intros, simp [*,f,g,if_pos] } }
+end
+
+#exit
+
+def supp_mk_tt' {α} (x : α) : qpf.supp' (foo.mk tt x) = {x} :=
+begin
+  dsimp [qpf.supp'], ext, simp, dsimp [qpf.box], split; intro h,
+  { specialize h {x} _, { simp at h, assumption },
+    clear h, introv hfg, simp, rw hfg, simp },
+  { introv hfg, subst x_1, classical,
+    let f : α → α ⊕ bool := λ x, if x ∈ i then sum.inl x else sum.inr tt,
+    let g : α → α ⊕ bool := λ x, if x ∈ i then sum.inl x else sum.inr ff,
+    specialize hfg _ f g _,
+    { simp [f,g] at hfg, split_ifs at hfg,
+      assumption, cases hfg },
+    { intros, simp [*,f,g,if_pos] } }
+end
+end ex
